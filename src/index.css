@@ -1,1 +1,44 @@
 @import "tailwindcss";
+
+@theme {
+  /* 배경 */
+  --color-bg-page: #faf9f5;
+  --color-bg-card: #ffffff;
+  --color-bg-subtle: #ede8da;
+  --color-bg-divider: #f0ebe0;
+  --color-bg-highlight: #f5efe2;
+
+  /* 텍스트 */
+  --color-text-primary: #1e2a38;
+  --color-text-secondary: #3a4a5c;
+  --color-text-muted: #7a8ca0;
+  --color-text-disabled: #a8b4c4;
+
+  /* 테두리 */
+  --color-border-default: #e8e4d8;
+  --color-border-strong: #d8d3c4;
+  --color-border-subtle: #f0ebe0;
+
+  /* 액센트 */
+  --color-accent-brown: #b08d5c;
+  --color-accent-brown-bg: #f5efe2;
+
+  /* 폰트 */
+  --font-sans:
+    "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;
+}
+
+/* 전역 폰트 적용 */
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* iOS Safari 하이라이트 제거 */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
