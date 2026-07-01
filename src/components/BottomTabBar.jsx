@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   IconHome,
-  IconMap2,
+  IconStar,
   IconChartBar,
   IconUser,
   IconPlus,
@@ -61,20 +61,20 @@ function BottomTabBar() {
           </span>
         </Link>
 
-        {/* 지도 */}
-        <Link to="/map" className="flex flex-col items-center gap-1">
-          <IconMap2
+        {/* 즐겨찾기 */}
+        <Link to="/favorites" className="flex flex-col items-center gap-1">
+          <IconStar
             size={22}
-            color={isActive("/map") ? activeColor : inactiveColor}
+            color={isActive("/favorites") ? activeColor : inactiveColor}
           />
           <span
             className="font-medium"
             style={{
               fontSize: "10px",
-              color: isActive("/map") ? activeColor : inactiveColor,
+              color: isActive("/favorites") ? activeColor : inactiveColor,
             }}
           >
-            지도
+            즐겨찾기
           </span>
         </Link>
 

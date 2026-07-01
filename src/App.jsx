@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import TripDetailPage from "./pages/TripDetailPage";
-import MapPage from "./pages/MapPage";
+import FavoritesPage from "./pages/FavoritesPage";
 import StatsPage from "./pages/StatsPage";
 import ProfilePage from "./pages/ProfilePage";
 import BottomTabBar from "./components/BottomTabBar";
@@ -20,7 +20,7 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/trips/:id" element={<TripDetailPage />} />
-            <Route path="/map" element={<MapPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Routes>
