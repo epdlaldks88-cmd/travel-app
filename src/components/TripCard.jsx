@@ -30,6 +30,20 @@ function TripCard({ trip, onDelete }) {
               </span>
             )}
           </h3>
+          {trip.activities?.length > 0 && (
+            <p className="text-sm text-slate-500 mt-1">
+              📌 일정 {trip.activities.length}개
+              {trip.activities.reduce((s, a) => s + (a.cost || 0), 0) > 0 && (
+                <span className="ml-2">
+                  💰{" "}
+                  {trip.activities
+                    .reduce((s, a) => s + (a.cost || 0), 0)
+                    .toLocaleString()}
+                  원
+                </span>
+              )}
+            </p>
+          )}
           {(trip.startDate || trip.endDate) && (
             <p className="text-sm text-slate-500 mt-1">
               📅 {trip.startDate} ~ {trip.endDate}

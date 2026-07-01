@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import ActivityForm from "../components/ActivityForm";
+import ActivityItem from "../components/ActivityItem";
 
 function TripDetailPage() {
-  const { id } = useParams(); // URL에서 :id 추출
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [trip, setTrip] = useState(null);
   const [memo, setMemo] = useState("");
   const [rating, setRating] = useState(0);
+  const [activities, setActivities] = useState([]);
+  const [showActivityForm, setShowActivityForm] = useState(false);
 
-  // localStorage에서 해당 여행 불러오기
+  // 처음 불러오기
   useEffect(() => {
     const saved = localStorage.getItem("trips");
     if (!saved) return;
@@ -21,24 +25,63 @@ function TripDetailPage() {
       setTrip(found);
       setMemo(found.memo || "");
       setRating(found.rating || 0);
+      setActivities(found.activities || []);
     }
   }, [id]);
 
-  // 저장
-  const handleSave = () => {
+  // 저장 헬퍼 (localStorage 갱신)
+  const saveToStorage = (updates) => {
     const saved = localStorage.getItem("trips");
     const trips = saved ? JSON.parse(saved) : [];
 
     const updated = trips.map((t) =>
-      String(t.id) === id ? { ...t, memo, rating } : t,
+      String(t.id) === id ? { ...t, ...updates } : t,
     );
 
     localStorage.setItem("trips", JSON.stringify(updated));
-    alert("저장되었습니다");
-    navigate("/"); // 홈으로 돌아가기
   };
 
-  // 여행 없을 때
+  // Activity 추가
+  const handleAddActivity = (newActivity) => {
+    const newActivities = [...activities, newActivity];
+    setActivities(newActivities);
+    saveToStorage({ activities: newActivities });
+    setShowActivityForm(false);
+  };
+
+  // Activity 삭제
+  const handleDeleteActivity = (activityId) => {
+    if (!confirm("이 일정을 삭제하시겠습니까?")) return;
+    const newActivities = activities.filter((a) => a.id !== activityId);
+    setActivities(newActivities);
+    saveToStorage({ activities: newActivities });
+  };
+
+  // 여행 정보 저장 (평점 · 메모)
+  const handleSave = () => {
+    saveToStorage({ memo, rating });
+    alert("저장되었습니다");
+  };
+
+  // 총 지출 계산
+  const totalCost = activities.reduce((sum, a) => sum + (a.cost || 0), 0);
+
+  // 날짜별 그룹핑
+  const groupedByDate = activities.reduce((acc, a) => {
+    const key = a.date || "날짜 없음";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(a);
+    return acc;
+  }, {});
+
+  // 날짜별로 정렬, 각 날짜 안에서는 시간순
+  const sortedDates = Object.keys(groupedByDate).sort();
+  sortedDates.forEach((date) => {
+    groupedByDate[date].sort((a, b) =>
+      (a.time || "").localeCompare(b.time || ""),
+    );
+  });
+
   if (!trip) {
     return (
       <div className="text-center py-12">
@@ -52,7 +95,7 @@ function TripDetailPage() {
 
   return (
     <div>
-      {/* 뒤로 가기 */}
+      {/* 뒤로 */}
       <Link
         to="/"
         className="inline-block text-slate-500 hover:text-slate-700 mb-4"
@@ -71,16 +114,75 @@ function TripDetailPage() {
         {trip.companions && (
           <p className="text-slate-500">👥 {trip.companions}</p>
         )}
+        {totalCost > 0 && (
+          <p className="text-slate-500 mt-2">
+            💰 총 지출:{" "}
+            <span className="font-semibold text-slate-700">
+              {totalCost.toLocaleString()}원
+            </span>
+          </p>
+        )}
+      </section>
+
+      {/* 일정 */}
+      <section className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold text-slate-700">
+            일정 ({activities.length})
+          </h2>
+          {!showActivityForm && (
+            <button
+              onClick={() => setShowActivityForm(true)}
+              className="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition"
+            >
+              + 추가
+            </button>
+          )}
+        </div>
+
+        {/* Activity 폼 (토글) */}
+        {showActivityForm && (
+          <ActivityForm
+            tripStartDate={trip.startDate}
+            onAdd={handleAddActivity}
+            onCancel={() => setShowActivityForm(false)}
+          />
+        )}
+
+        {/* 일정 없을 때 */}
+        {activities.length === 0 && !showActivityForm && (
+          <div className="bg-white rounded-2xl p-8 text-center text-slate-400">
+            아직 일정이 없습니다
+          </div>
+        )}
+
+        {/* 날짜별 그룹 */}
+        {sortedDates.map((date) => (
+          <div key={date} className="mb-4">
+            <h3 className="text-sm font-medium text-slate-500 mb-2 px-1">
+              📅 {date}
+            </h3>
+            <div className="space-y-2">
+              {groupedByDate[date].map((activity) => (
+                <ActivityItem
+                  key={activity.id}
+                  activity={activity}
+                  onDelete={handleDeleteActivity}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
 
       {/* 평점 */}
       <section className="bg-white rounded-2xl shadow-sm p-5 mb-6">
-        <h2 className="text-lg font-semibold text-slate-700 mb-3">평점</h2>
+        <h2 className="text-lg font-semibold text-slate-700 mb-3">전체 평점</h2>
         <div className="flex gap-2">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
               key={star}
-              onClick={() => setRating(star)}
+              onClick={() => setRating(star === rating ? 0 : star)}
               className={`text-3xl transition ${
                 star <= rating ? "text-yellow-400" : "text-slate-200"
               }`}
@@ -89,9 +191,6 @@ function TripDetailPage() {
             </button>
           ))}
         </div>
-        <p className="text-sm text-slate-500 mt-2">
-          {rating > 0 ? `${rating}점` : "아직 평가 없음"}
-        </p>
       </section>
 
       {/* 메모 */}
@@ -106,12 +205,11 @@ function TripDetailPage() {
         />
       </section>
 
-      {/* 저장 버튼 */}
       <button
         onClick={handleSave}
         className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 rounded-lg transition"
       >
-        저장하기
+        평점·메모 저장하기
       </button>
     </div>
   );
