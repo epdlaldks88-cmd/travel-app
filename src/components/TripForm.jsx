@@ -12,7 +12,6 @@ function TripForm({ onAdd }) {
       return;
     }
 
-    // 부모에게 새 여행 정보 전달
     onAdd({
       id: Date.now(),
       title,
@@ -21,66 +20,117 @@ function TripForm({ onAdd }) {
       companions,
     });
 
-    // 폼 초기화
     setTitle("");
     setStartDate("");
     setEndDate("");
     setCompanions("");
   };
 
+  // 공통 input 스타일
+  const inputStyle = {
+    background: "#FFFFFF",
+    border: "0.5px solid #E8E4D8",
+    color: "#1E2A38",
+    fontSize: "14px",
+  };
+
+  // 공통 label 스타일
+  const labelStyle = {
+    color: "#7A8CA0",
+    fontSize: "11px",
+    letterSpacing: "0.5px",
+  };
+
   return (
-    <section className="bg-white rounded-2xl shadow-sm p-5 mb-6">
-      <h2 className="text-lg font-semibold text-slate-700 mb-4">
+    <section
+      className="rounded-xl p-5 mb-6"
+      style={{
+        background: "#FFFFFF",
+        border: "0.5px solid #E8E4D8",
+      }}
+    >
+      <h2 className="text-base font-medium mb-4" style={{ color: "#1E2A38" }}>
         새 여행 추가
       </h2>
 
       <div className="space-y-3">
+        {/* 여행 제목 */}
         <div>
-          <label className="block text-sm text-slate-600 mb-1">여행 제목</label>
+          <label className="block mb-1.5" style={labelStyle}>
+            여행 제목
+          </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 강릉 1박2일"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-3 py-2 rounded-md focus:outline-none"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
+            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
           />
         </div>
 
+        {/* 시작일 · 종료일 */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm text-slate-600 mb-1">시작일</label>
+            <label className="block mb-1.5" style={labelStyle}>
+              시작일
+            </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full px-3 py-2 rounded-md focus:outline-none"
+              style={inputStyle}
+              onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
+              onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-600 mb-1">종료일</label>
+            <label className="block mb-1.5" style={labelStyle}>
+              종료일
+            </label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full px-3 py-2 rounded-md focus:outline-none"
+              style={inputStyle}
+              onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
+              onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
             />
           </div>
         </div>
 
+        {/* 동행자 */}
         <div>
-          <label className="block text-sm text-slate-600 mb-1">동행자</label>
+          <label className="block mb-1.5" style={labelStyle}>
+            동행자
+          </label>
           <input
             type="text"
             value={companions}
             onChange={(e) => setCompanions(e.target.value)}
             placeholder="예: 가족, 친구"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-3 py-2 rounded-md focus:outline-none"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
+            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
           />
         </div>
 
+        {/* 추가 버튼 */}
         <button
           onClick={handleSubmit}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2.5 rounded-lg transition"
+          className="w-full font-medium py-3 rounded-lg transition-opacity"
+          style={{
+            background: "#1E2A38",
+            color: "#FFFFFF",
+            fontSize: "14px",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
         >
           + 여행 추가
         </button>
