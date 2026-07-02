@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 
-// 여행 일수 계산 헬퍼
 const calcDays = (start, end) => {
   if (!start || !end) return null;
   const startD = new Date(start);
@@ -9,7 +8,6 @@ const calcDays = (start, end) => {
   return diff > 0 ? `${diff}일` : null;
 };
 
-// 날짜 → 영문 대문자 짧게 (예: "2026-06-28" → "JUN 28")
 const formatShort = (dateStr) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -30,7 +28,6 @@ const formatShort = (dateStr) => {
   return `${months[d.getMonth()]} ${d.getDate()}`;
 };
 
-// 별점 렌더링 (◆ 채움 + ◆ 빈)
 const renderStars = (rating) => {
   if (!rating || rating < 1) return null;
   const filled = "◆".repeat(rating);
@@ -43,10 +40,25 @@ const renderStars = (rating) => {
   );
 };
 
+// 지역 표시 헬퍼
+const getRegionLabel = (trip) => {
+  if (trip.countryType === "international") {
+    return trip.countryName || "";
+  }
+  // 국내: 광역 · 세부 (세부 있으면)
+  const major = trip.regionMajor || "";
+  const minor = trip.regionMinor || "";
+  if (major && minor) {
+    // "강원 전체" 같은 건 세부지역 표시 안 함
+    if (minor.endsWith("전체")) return major;
+    return `${major} · ${minor}`;
+  }
+  return major;
+};
+
 function TripCard({ trip, onDelete }) {
   const days = calcDays(trip.startDate, trip.endDate);
 
-  // 날짜 표시: JUN 28 – 30 형식
   const dateDisplay =
     trip.startDate && trip.endDate
       ? `${formatShort(trip.startDate)} – ${new Date(trip.endDate).getDate()}`
@@ -54,26 +66,67 @@ function TripCard({ trip, onDelete }) {
         ? formatShort(trip.startDate)
         : "";
 
+  // 나라 뱃지
+  const countryBadge =
+    trip.countryType === "international" && trip.countryName
+      ? trip.countryName
+      : trip.countryType === "international"
+        ? "해외"
+        : "국내";
+
+  const displayCategories = (trip.categories || []).slice(0, 2);
+  const regionLabel = getRegionLabel(trip);
+
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-xl overflow-hidden relative"
       style={{
         background: "#FFFFFF",
         border: "0.5px solid #E8E4D8",
       }}
     >
       <Link to={`/trips/${trip.id}`} className="block">
-        {/* 커버 그라디언트 (사진 없을 때) */}
         <div
           className="relative"
           style={{
-            height: "80px",
+            height: "90px",
             background: "linear-gradient(135deg, #A8C0D6 0%, #6B8AA8 100%)",
           }}
         >
-          {/* 여행 기간 뱃지 (좌상단) */}
+          {/* 카테고리 (좌상단) */}
+          {displayCategories.length > 0 && (
+            <div className="absolute top-2 left-2 flex gap-1">
+              {displayCategories.map((cat) => (
+                <span
+                  key={cat}
+                  className="text-[10px] px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "rgba(255,255,255,0.9)",
+                    color: "#3A4A5C",
+                  }}
+                >
+                  {cat}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 나라 뱃지 (우하단) */}
+          <div className="absolute bottom-2 right-2">
+            <span
+              className="text-[10px] px-2 py-0.5 rounded-full"
+              style={{
+                background: "rgba(0,0,0,0.3)",
+                color: "#FFFFFF",
+              }}
+            >
+              {countryBadge}
+            </span>
+          </div>
+
+          {/* 여행 기간 (좌하단) */}
           {days && (
-            <div className="absolute top-2 left-2">
+            <div className="absolute bottom-2 left-2">
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full"
                 style={{
@@ -93,6 +146,13 @@ function TripCard({ trip, onDelete }) {
             {trip.title}
           </h3>
 
+          {/* 지역 (있으면) */}
+          {regionLabel && (
+            <p className="text-xs mt-1" style={{ color: "#7A8CA0" }}>
+              📍 {regionLabel}
+            </p>
+          )}
+
           <div className="flex justify-between items-center mt-1.5">
             <span
               className="text-xs"
@@ -106,9 +166,12 @@ function TripCard({ trip, onDelete }) {
         </div>
       </Link>
 
-      {/* 삭제 버튼 (Link 밖에) */}
+      {/* 삭제 */}
       <button
-        onClick={() => onDelete(trip.id)}
+        onClick={(e) => {
+          e.preventDefault();
+          onDelete(trip.id);
+        }}
         className="absolute top-2 right-2 text-lg"
         style={{ color: "rgba(255,255,255,0.7)" }}
         title="삭제"
