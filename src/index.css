@@ -1,44 +1,29 @@
 @import "tailwindcss";
 
-@theme {
-  /* 배경 */
-  --color-bg-page: #faf9f5;
-  --color-bg-card: #ffffff;
-  --color-bg-subtle: #ede8da;
-  --color-bg-divider: #f0ebe0;
-  --color-bg-highlight: #f5efe2;
-
-  /* 텍스트 */
-  --color-text-primary: #1e2a38;
-  --color-text-secondary: #3a4a5c;
-  --color-text-muted: #7a8ca0;
-  --color-text-disabled: #a8b4c4;
-
-  /* 테두리 */
-  --color-border-default: #e8e4d8;
-  --color-border-strong: #d8d3c4;
-  --color-border-subtle: #f0ebe0;
-
-  /* 액센트 */
-  --color-accent-brown: #b08d5c;
-  --color-accent-brown-bg: #f5efe2;
-
-  /* 폰트 */
-  --font-sans:
-    "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
-    "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;
+/* ─── Theme: Tailwind v4 utility mapping ───────────────────
+   실제 CSS 변수 값은 ThemeProvider 가 :root 에 주입.
+   이 블록은 Tailwind 유틸리티 이름과 CSS 변수를 연결만 함. */
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-alt: var(--color-surface-alt);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-subtle: var(--color-text-subtle);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-accent: var(--color-accent);
+  --color-accent-fg: var(--color-accent-fg);
+  --color-danger: var(--color-danger);
+  --color-success: var(--color-success);
 }
 
-/* 전역 폰트 적용 */
+/* ─── Global: 배경/텍스트에 테마 색상 적용 + 부드러운 전환 ── */
+html,
 body {
-  font-family: var(--font-sans);
-  background: var(--color-bg-page);
-  color: var(--color-text-primary);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* iOS Safari 하이라이트 제거 */
-button {
-  -webkit-tap-highlight-color: transparent;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
 }
