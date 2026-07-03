@@ -94,8 +94,8 @@ function TripDetailPage() {
   return (
     // 페이지 상위에 적용된 p-4 를 무효화하여 히어로가 전폭 커버
     <div className="-mt-4 -mx-4">
-      {/* ─── 히어로 커버 (임시 그라디언트) ─────────────────── */}
-      <div className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-[#6B8AA8] to-[#3A4A5C]">
+      {/* ─── 히어로 커버 (테마별 그라데이션) ─────────────── */}
+      <div className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-hero-from to-hero-to">
         <div className="flex justify-between">
           <button
             type="button"

@@ -16,6 +16,8 @@
   --color-accent-fg: var(--color-accent-fg);
   --color-danger: var(--color-danger);
   --color-success: var(--color-success);
+  --color-hero-from: var(--color-hero-from);
+  --color-hero-to: var(--color-hero-to);
 }
 
 /* ─── Global: 배경/텍스트에 테마 색상 적용 + 부드러운 전환 ── */

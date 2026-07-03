@@ -67,8 +67,8 @@ function TripCard({ trip, onDelete }) {
   return (
     <div className="relative bg-surface border border-border rounded-xl overflow-hidden">
       <Link to={`/trips/${trip.id}`} className="block">
-        {/* 상단 썸네일 영역 (임시 그라디언트, 향후 실제 이미지로 교체 예정) */}
-        <div className="relative h-[90px] bg-gradient-to-br from-[#A8C0D6] to-[#6B8AA8]">
+        {/* 상단 썸네일 영역 (테마별 히어로 그라데이션) */}
+        <div className="relative h-[90px] bg-gradient-to-br from-hero-from to-hero-to">
           {/* 카테고리 (좌상단) */}
           {displayCategories.length > 0 && (
             <div className="absolute top-2 left-2 flex gap-1">
