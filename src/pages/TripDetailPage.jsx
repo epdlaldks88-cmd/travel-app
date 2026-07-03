@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { IconArrowLeft, IconCameraPlus, IconPlus } from "@tabler/icons-react";
 import ActivityForm from "../components/ActivityForm";
 import ActivityItem from "../components/ActivityItem";
+import { Button, Card, Rating, Textarea } from "../components/ui";
 
 function TripDetailPage() {
   const { id } = useParams();
@@ -40,7 +41,6 @@ function TripDetailPage() {
     localStorage.setItem("trips", JSON.stringify(updated));
   };
 
-  // Activity 추가
   const handleAddActivity = (newActivity) => {
     const newActivities = [...activities, newActivity];
     setActivities(newActivities);
@@ -48,7 +48,6 @@ function TripDetailPage() {
     setShowActivityForm(false);
   };
 
-  // Activity 삭제
   const handleDeleteActivity = (activityId) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return;
     const newActivities = activities.filter((a) => a.id !== activityId);
@@ -56,13 +55,11 @@ function TripDetailPage() {
     saveToStorage({ activities: newActivities });
   };
 
-  // 평점 · 메모 저장
   const handleSave = () => {
     saveToStorage({ memo, rating });
     alert("저장되었습니다");
   };
 
-  // 총 지출 계산
   const totalCost = activities.reduce((sum, a) => sum + (a.cost || 0), 0);
 
   // 날짜순 → 시간순 정렬
@@ -75,7 +72,6 @@ function TripDetailPage() {
     return timeA.localeCompare(timeB);
   });
 
-  // 날짜 포맷
   const formatFull = (dateStr) => {
     if (!dateStr) return "";
     return dateStr.replaceAll("-", ".");
@@ -84,10 +80,11 @@ function TripDetailPage() {
   if (!trip) {
     return (
       <div className="text-center py-12">
-        <p className="mb-4" style={{ color: "#7A8CA0" }}>
-          여행을 찾을 수 없습니다
-        </p>
-        <Link to="/" className="text-sm" style={{ color: "#3A4A5C" }}>
+        <p className="text-text-muted mb-4">여행을 찾을 수 없습니다</p>
+        <Link
+          to="/"
+          className="text-sm text-text-muted hover:text-text transition-colors"
+        >
           ← 목록으로
         </Link>
       </div>
@@ -95,48 +92,34 @@ function TripDetailPage() {
   }
 
   return (
-    <div style={{ margin: "-16px -16px 0 -16px" }}>
-      {/* 히어로 커버 */}
-      <div
-        className="relative"
-        style={{
-          height: "180px",
-          background: "linear-gradient(135deg, #6B8AA8 0%, #3A4A5C 100%)",
-          padding: "12px 16px",
-        }}
-      >
+    // 페이지 상위에 적용된 p-4 를 무효화하여 히어로가 전폭 커버
+    <div className="-mt-4 -mx-4">
+      {/* ─── 히어로 커버 (임시 그라디언트) ─────────────────── */}
+      <div className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-[#6B8AA8] to-[#3A4A5C]">
         <div className="flex justify-between">
           <button
+            type="button"
             onClick={() => navigate("/")}
-            className="rounded-full p-1.5"
-            style={{ background: "rgba(0,0,0,0.15)", color: "#FFFFFF" }}
+            aria-label="뒤로 가기"
+            className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
           >
             <IconArrowLeft size={18} />
           </button>
           <button
-            className="rounded-full p-1.5"
-            style={{ background: "rgba(0,0,0,0.15)", color: "#FFFFFF" }}
+            type="button"
+            aria-label="사진 추가 (준비 중)"
             title="사진 추가 (준비 중)"
+            className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
           >
             <IconCameraPlus size={18} />
           </button>
         </div>
 
         <div className="absolute bottom-4 left-4 right-4">
-          <h1
-            className="font-medium"
-            style={{
-              color: "#FFFFFF",
-              fontSize: "20px",
-              letterSpacing: "-0.3px",
-            }}
-          >
+          <h1 className="text-xl font-medium text-white tracking-tight">
             {trip.title}
           </h1>
-          <p
-            className="mt-1"
-            style={{ color: "rgba(255,255,255,0.85)", fontSize: "12px" }}
-          >
+          <p className="text-xs text-white/85 mt-1">
             {trip.startDate && trip.endDate && (
               <>
                 {formatFull(trip.startDate)} –{" "}
@@ -148,104 +131,40 @@ function TripDetailPage() {
         </div>
       </div>
 
-      {/* 통계 로우 */}
-      <div
-        className="flex justify-between px-4 py-3"
-        style={{
-          background: "#FAF9F5",
-          borderBottom: "0.5px solid #E8E4D8",
-        }}
-      >
-        <div className="text-center flex-1">
-          <div
-            className="font-medium"
-            style={{ color: "#1E2A38", fontSize: "18px" }}
-          >
-            {activities.length}
-          </div>
-          <div
-            className="mt-0.5"
-            style={{
-              color: "#7A8CA0",
-              fontSize: "10px",
-              letterSpacing: "0.5px",
-            }}
-          >
-            일정
-          </div>
-        </div>
-        <div className="text-center flex-1">
-          <div
-            className="font-medium"
-            style={{ color: "#1E2A38", fontSize: "18px" }}
-          >
-            {totalCost > 0 ? `${totalCost.toLocaleString()}원` : "0원"}
-          </div>
-          <div
-            className="mt-0.5"
-            style={{
-              color: "#7A8CA0",
-              fontSize: "10px",
-              letterSpacing: "0.5px",
-            }}
-          >
-            지출
-          </div>
-        </div>
-        <div className="text-center flex-1">
-          <div
-            className="font-medium"
-            style={{
-              color: rating > 0 ? "#B08D5C" : "#A8B4C4",
-              fontSize: "18px",
-            }}
-          >
-            {rating > 0 ? `◆${rating}.0` : "–"}
-          </div>
-          <div
-            className="mt-0.5"
-            style={{
-              color: "#7A8CA0",
-              fontSize: "10px",
-              letterSpacing: "0.5px",
-            }}
-          >
-            평점
-          </div>
-        </div>
+      {/* ─── 통계 로우 ──────────────────────────────────── */}
+      <div className="flex justify-between px-4 py-3 bg-bg border-b border-border">
+        <StatCell label="일정" value={activities.length} />
+        <StatCell
+          label="지출"
+          value={totalCost > 0 ? `${totalCost.toLocaleString()}원` : "0원"}
+        />
+        <StatCell
+          label="평점"
+          value={rating > 0 ? `◆${rating.toFixed(1)}` : "–"}
+          highlight={rating > 0}
+        />
       </div>
 
-      {/* 본문 */}
+      {/* ─── 본문 ────────────────────────────────────────── */}
       <div className="p-4">
         {/* 일정 섹션 */}
         <section className="mb-4">
           <div className="flex justify-between items-center mb-3">
-            <h2
-              className="font-medium"
-              style={{ color: "#1E2A38", fontSize: "14px" }}
-            >
+            <h2 className="text-sm font-medium text-text">
               일정 ({activities.length})
             </h2>
             {!showActivityForm && (
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => setShowActivityForm(true)}
-                className="rounded-lg px-3 py-1.5 flex items-center gap-1 transition-opacity"
-                style={{
-                  background: "#1E2A38",
-                  color: "#FFFFFF",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                leftIcon={<IconPlus size={14} />}
               >
-                <IconPlus size={14} />
                 추가
-              </button>
+              </Button>
             )}
           </div>
 
-          {/* Activity 폼 */}
           {showActivityForm && (
             <ActivityForm
               tripStartDate={trip.startDate}
@@ -255,22 +174,12 @@ function TripDetailPage() {
             />
           )}
 
-          {/* 일정 없을 때 */}
           {activities.length === 0 && !showActivityForm && (
-            <div
-              className="rounded-xl p-8 text-center"
-              style={{
-                background: "#FFFFFF",
-                border: "0.5px solid #E8E4D8",
-                color: "#A8B4C4",
-                fontSize: "13px",
-              }}
-            >
+            <Card padding="lg" className="text-center text-text-subtle text-sm">
               아직 일정이 없습니다
-            </div>
+            </Card>
           )}
 
-          {/* Activity 리스트 */}
           {sortedActivities.map((activity) => (
             <ActivityItem
               key={activity.id}
@@ -280,79 +189,49 @@ function TripDetailPage() {
           ))}
         </section>
 
-        {/* 평점 */}
-        <section
-          className="rounded-xl p-4 mb-4"
-          style={{
-            background: "#FFFFFF",
-            border: "0.5px solid #E8E4D8",
-          }}
-        >
-          <h2
-            className="font-medium mb-3"
-            style={{ color: "#1E2A38", fontSize: "14px" }}
-          >
-            전체 평점
-          </h2>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onClick={() => setRating(star === rating ? 0 : star)}
-                className="text-3xl transition-opacity"
-                style={{ color: star <= rating ? "#B08D5C" : "#E8E4D8" }}
-              >
-                ◆
-              </button>
-            ))}
-          </div>
-        </section>
+        {/* 전체 평점 */}
+        <Card padding="md" className="mb-4">
+          <h2 className="text-sm font-medium text-text mb-3">전체 평점</h2>
+          <Rating value={rating} onChange={setRating} size="lg" />
+        </Card>
 
-        {/* 메모 */}
-        <section
-          className="rounded-xl p-4 mb-4"
-          style={{
-            background: "#FFFFFF",
-            border: "0.5px solid #E8E4D8",
-          }}
-        >
-          <h2
-            className="font-medium mb-3"
-            style={{ color: "#1E2A38", fontSize: "14px" }}
-          >
-            한줄 회고
-          </h2>
-          <textarea
+        {/* 한줄 회고 */}
+        <Card padding="md" className="mb-4">
+          <h2 className="text-sm font-medium text-text mb-3">한줄 회고</h2>
+          <Textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="이 여행은 어땠나요?"
             rows={4}
-            className="w-full px-3 py-2 rounded-md focus:outline-none resize-none"
-            style={{
-              background: "#FFFFFF",
-              border: "0.5px solid #E8E4D8",
-              color: "#1E2A38",
-              fontSize: "14px",
-            }}
-            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
+            className="resize-none"
           />
-        </section>
+        </Card>
 
         {/* 저장 버튼 */}
-        <button
-          onClick={handleSave}
-          className="w-full font-medium py-3 rounded-lg transition-opacity"
-          style={{
-            background: "#1E2A38",
-            color: "#FFFFFF",
-            fontSize: "14px",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        >
+        <Button variant="primary" onClick={handleSave} fullWidth size="lg">
           평점 · 메모 저장하기
-        </button>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 통계 로우의 개별 셀 (일정/지출/평점).
+ * highlight=true 면 값 텍스트를 accent 색으로.
+ */
+function StatCell({ label, value, highlight }) {
+  return (
+    <div className="text-center flex-1">
+      <div
+        className={`text-lg font-medium ${
+          highlight ? "text-accent" : "text-text"
+        }`}
+      >
+        {value}
+      </div>
+      <div className="mt-0.5 text-[10px] text-text-muted tracking-wide">
+        {label}
       </div>
     </div>
   );

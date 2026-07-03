@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { IconPlus } from "@tabler/icons-react";
 import { DOMESTIC_REGIONS, COUNTRIES } from "../data/regions";
+import { Button, Card, Chip, Input, Select, Label } from "./ui";
 
 const CATEGORY_OPTIONS = ["바다", "산", "도시", "맛집", "문화"];
 
@@ -19,13 +21,11 @@ function TripForm({ onAdd }) {
   const selectedMajor = DOMESTIC_REGIONS.find((r) => r.major === regionMajor);
   const availableMinors = selectedMajor ? selectedMajor.minors : [];
 
-  // 국내 광역 선택 시 세부 지역 초기화
   const handleMajorChange = (value) => {
     setRegionMajor(value);
     setRegionMinor(""); // 세부지역 리셋
   };
 
-  // 국내/해외 전환 시 관련 값 리셋
   const handleCountryTypeChange = (type) => {
     setCountryType(type);
     setCountryName("");
@@ -70,230 +70,139 @@ function TripForm({ onAdd }) {
     setCategories([]);
   };
 
-  // 스타일
-  const inputStyle = {
-    background: "#FFFFFF",
-    border: "0.5px solid #E8E4D8",
-    color: "#1E2A38",
-    fontSize: "14px",
-  };
-  const labelStyle = {
-    color: "#7A8CA0",
-    fontSize: "11px",
-    letterSpacing: "0.5px",
-  };
-  const selectStyle = {
-    ...inputStyle,
-    appearance: "none",
-    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237A8CA0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>")`,
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "right 10px center",
-    paddingRight: "32px",
-  };
+  /* ─── Select options ──────────────────────────────────────
+     원본 UX 유지: 첫 옵션이 리셋 가능하도록 빈 옵션을 명시. */
+  const majorOptions = [
+    { value: "", label: "광역 선택" },
+    ...DOMESTIC_REGIONS.map((r) => ({ value: r.major, label: r.major })),
+  ];
+  const minorOptions = [
+    { value: "", label: "세부 지역 선택 (선택 사항)" },
+    ...availableMinors.map((m) => ({ value: m, label: m })),
+  ];
+  const countryOptions = [
+    { value: "", label: "국가 선택" },
+    ...COUNTRIES.map((c) => ({ value: c, label: c })),
+  ];
 
   return (
-    <section
-      className="rounded-xl p-5 mb-6"
-      style={{
-        background: "#FFFFFF",
-        border: "0.5px solid #E8E4D8",
-      }}
-    >
-      <h2 className="text-base font-medium mb-4" style={{ color: "#1E2A38" }}>
-        새 여행 추가
-      </h2>
+    <Card padding="lg" className="mb-6">
+      <h2 className="text-base font-medium text-text mb-4">새 여행 추가</h2>
 
       <div className="space-y-3">
         {/* 여행 제목 */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
-            여행 제목
-          </label>
-          <input
-            type="text"
+          <Label>여행 제목</Label>
+          <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 강릉 1박2일"
-            className="w-full px-3 py-2 rounded-md focus:outline-none"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
           />
         </div>
 
-        {/* 국내/해외 선택 */}
+        {/* 지역 (국내/해외 토글 + 드롭다운) */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
-            지역
-          </label>
+          <Label>지역</Label>
           <div className="flex gap-2 mb-2">
-            <button
+            <Chip
+              variant={countryType === "domestic" ? "selected" : "default"}
               onClick={() => handleCountryTypeChange("domestic")}
-              className="px-4 py-1.5 rounded-full text-xs font-medium transition-colors"
-              style={{
-                background: countryType === "domestic" ? "#1E2A38" : "#EDE8DA",
-                color: countryType === "domestic" ? "#FFFFFF" : "#3A4A5C",
-              }}
             >
               국내
-            </button>
-            <button
+            </Chip>
+            <Chip
+              variant={countryType === "international" ? "selected" : "default"}
               onClick={() => handleCountryTypeChange("international")}
-              className="px-4 py-1.5 rounded-full text-xs font-medium transition-colors"
-              style={{
-                background:
-                  countryType === "international" ? "#1E2A38" : "#EDE8DA",
-                color: countryType === "international" ? "#FFFFFF" : "#3A4A5C",
-              }}
             >
               해외
-            </button>
+            </Chip>
           </div>
 
           {/* 국내: 광역 → 세부 순차 드롭다운 */}
           {countryType === "domestic" && (
             <div className="space-y-2">
-              <select
+              <Select
                 value={regionMajor}
                 onChange={(e) => handleMajorChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-md focus:outline-none"
-                style={selectStyle}
-              >
-                <option value="">광역 선택</option>
-                {DOMESTIC_REGIONS.map((r) => (
-                  <option key={r.major} value={r.major}>
-                    {r.major}
-                  </option>
-                ))}
-              </select>
-
-              {/* 광역 선택되면 세부 드롭다운 자동 노출 */}
+                options={majorOptions}
+              />
               {regionMajor && (
-                <select
+                <Select
                   value={regionMinor}
                   onChange={(e) => setRegionMinor(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md focus:outline-none"
-                  style={selectStyle}
-                >
-                  <option value="">세부 지역 선택 (선택 사항)</option>
-                  {availableMinors.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                  options={minorOptions}
+                />
               )}
             </div>
           )}
 
           {/* 해외: 국가 드롭다운 */}
           {countryType === "international" && (
-            <select
+            <Select
               value={countryName}
               onChange={(e) => setCountryName(e.target.value)}
-              className="w-full px-3 py-2 rounded-md focus:outline-none"
-              style={selectStyle}
-            >
-              <option value="">국가 선택</option>
-              {COUNTRIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              options={countryOptions}
+            />
           )}
         </div>
 
         {/* 시작일 · 종료일 */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block mb-1.5" style={labelStyle}>
-              시작일
-            </label>
-            <input
+            <Label>시작일</Label>
+            <Input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-md focus:outline-none"
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-              onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
             />
           </div>
           <div>
-            <label className="block mb-1.5" style={labelStyle}>
-              종료일
-            </label>
-            <input
+            <Label>종료일</Label>
+            <Input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-md focus:outline-none"
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-              onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
             />
           </div>
         </div>
 
         {/* 동행자 */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
-            동행자
-          </label>
-          <input
-            type="text"
+          <Label>동행자</Label>
+          <Input
             value={companions}
             onChange={(e) => setCompanions(e.target.value)}
             placeholder="예: 가족, 친구"
-            className="w-full px-3 py-2 rounded-md focus:outline-none"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
           />
         </div>
 
-        {/* 카테고리 (칩 다중) */}
+        {/* 카테고리 (다중 선택) */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
-            카테고리 (여러 개 선택 가능)
-          </label>
+          <Label>카테고리 (여러 개 선택 가능)</Label>
           <div className="flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((cat) => {
-              const isActive = categories.includes(cat);
-              return (
-                <button
-                  key={cat}
-                  onClick={() => toggleCategory(cat)}
-                  className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                  style={{
-                    background: isActive ? "#1E2A38" : "#EDE8DA",
-                    color: isActive ? "#FFFFFF" : "#3A4A5C",
-                  }}
-                >
-                  {cat}
-                </button>
-              );
-            })}
+            {CATEGORY_OPTIONS.map((cat) => (
+              <Chip
+                key={cat}
+                variant={categories.includes(cat) ? "selected" : "default"}
+                onClick={() => toggleCategory(cat)}
+              >
+                {cat}
+              </Chip>
+            ))}
           </div>
         </div>
 
         {/* 추가 버튼 */}
-        <button
+        <Button
+          variant="primary"
           onClick={handleSubmit}
-          className="w-full font-medium py-3 rounded-lg transition-opacity"
-          style={{
-            background: "#1E2A38",
-            color: "#FFFFFF",
-            fontSize: "14px",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          fullWidth
+          leftIcon={<IconPlus size={18} />}
         >
-          + 여행 추가
-        </button>
+          여행 추가
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }
 

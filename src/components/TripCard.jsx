@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { IconX, IconMapPin } from "@tabler/icons-react";
+import { Rating } from "./ui";
 
 const calcDays = (start, end) => {
   if (!start || !end) return null;
@@ -28,28 +30,14 @@ const formatShort = (dateStr) => {
   return `${months[d.getMonth()]} ${d.getDate()}`;
 };
 
-const renderStars = (rating) => {
-  if (!rating || rating < 1) return null;
-  const filled = "◆".repeat(rating);
-  const empty = "◇".repeat(5 - rating);
-  return (
-    <span className="text-xs">
-      <span style={{ color: "#B08D5C" }}>{filled}</span>
-      <span style={{ color: "#E8E4D8" }}>{empty}</span>
-    </span>
-  );
-};
-
 // 지역 표시 헬퍼
 const getRegionLabel = (trip) => {
   if (trip.countryType === "international") {
     return trip.countryName || "";
   }
-  // 국내: 광역 · 세부 (세부 있으면)
   const major = trip.regionMajor || "";
   const minor = trip.regionMinor || "";
   if (major && minor) {
-    // "강원 전체" 같은 건 세부지역 표시 안 함
     if (minor.endsWith("전체")) return major;
     return `${major} · ${minor}`;
   }
@@ -66,7 +54,6 @@ function TripCard({ trip, onDelete }) {
         ? formatShort(trip.startDate)
         : "";
 
-  // 나라 뱃지
   const countryBadge =
     trip.countryType === "international" && trip.countryName
       ? trip.countryName
@@ -78,32 +65,17 @@ function TripCard({ trip, onDelete }) {
   const regionLabel = getRegionLabel(trip);
 
   return (
-    <div
-      className="rounded-xl overflow-hidden relative"
-      style={{
-        background: "#FFFFFF",
-        border: "0.5px solid #E8E4D8",
-      }}
-    >
+    <div className="relative bg-surface border border-border rounded-xl overflow-hidden">
       <Link to={`/trips/${trip.id}`} className="block">
-        <div
-          className="relative"
-          style={{
-            height: "90px",
-            background: "linear-gradient(135deg, #A8C0D6 0%, #6B8AA8 100%)",
-          }}
-        >
+        {/* 상단 썸네일 영역 (임시 그라디언트, 향후 실제 이미지로 교체 예정) */}
+        <div className="relative h-[90px] bg-gradient-to-br from-[#A8C0D6] to-[#6B8AA8]">
           {/* 카테고리 (좌상단) */}
           {displayCategories.length > 0 && (
             <div className="absolute top-2 left-2 flex gap-1">
               {displayCategories.map((cat) => (
                 <span
                   key={cat}
-                  className="text-[10px] px-2 py-0.5 rounded-full"
-                  style={{
-                    background: "rgba(255,255,255,0.9)",
-                    color: "#3A4A5C",
-                  }}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-white/90 text-[#3A4A5C]"
                 >
                   {cat}
                 </span>
@@ -111,72 +83,57 @@ function TripCard({ trip, onDelete }) {
             </div>
           )}
 
-          {/* 나라 뱃지 (우하단) */}
-          <div className="absolute bottom-2 right-2">
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full"
-              style={{
-                background: "rgba(0,0,0,0.3)",
-                color: "#FFFFFF",
-              }}
-            >
-              {countryBadge}
-            </span>
-          </div>
-
           {/* 여행 기간 (좌하단) */}
           {days && (
             <div className="absolute bottom-2 left-2">
-              <span
-                className="text-[10px] px-2 py-0.5 rounded-full"
-                style={{
-                  background: "rgba(255,255,255,0.9)",
-                  color: "#3A4A5C",
-                }}
-              >
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/90 text-[#3A4A5C]">
                 {days}
               </span>
             </div>
           )}
+
+          {/* 나라 뱃지 (우하단) */}
+          <div className="absolute bottom-2 right-2">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/30 text-white">
+              {countryBadge}
+            </span>
+          </div>
         </div>
 
         {/* 정보 영역 */}
         <div className="p-3">
-          <h3 className="text-base font-medium" style={{ color: "#1E2A38" }}>
-            {trip.title}
-          </h3>
+          <h3 className="text-base font-medium text-text">{trip.title}</h3>
 
-          {/* 지역 (있으면) */}
           {regionLabel && (
-            <p className="text-xs mt-1" style={{ color: "#7A8CA0" }}>
-              📍 {regionLabel}
+            <p className="inline-flex items-center gap-0.5 text-xs mt-1 text-text-muted">
+              <IconMapPin size={12} />
+              {regionLabel}
             </p>
           )}
 
           <div className="flex justify-between items-center mt-1.5">
-            <span
-              className="text-xs"
-              style={{ color: "#7A8CA0", letterSpacing: "0.3px" }}
-            >
+            <span className="text-xs text-text-muted tracking-wide">
               {dateDisplay}
               {trip.companions && ` · ${trip.companions}`}
             </span>
-            {renderStars(trip.rating)}
+            {trip.rating > 0 && (
+              <Rating value={trip.rating} readonly size="sm" />
+            )}
           </div>
         </div>
       </Link>
 
-      {/* 삭제 */}
+      {/* 삭제 버튼 (썸네일 우상단에 겹침) */}
       <button
+        type="button"
         onClick={(e) => {
           e.preventDefault();
           onDelete(trip.id);
         }}
-        className="absolute top-2 right-2 text-lg"
-        style={{ color: "rgba(255,255,255,0.7)" }}
-        title="삭제"
+        aria-label="여행 삭제"
+        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-black/20 transition-colors"
       >
-        ✕
+        <IconX size={16} />
       </button>
     </div>
   );

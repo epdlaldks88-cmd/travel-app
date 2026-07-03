@@ -14,6 +14,7 @@ import {
   IconRoute,
 } from "@tabler/icons-react";
 import { CUISINES, FOOD_TYPES, MEAL_TYPES } from "../data/foods";
+import { Button, Card, Chip, Input, Textarea, Label, Rating } from "./ui";
 
 const ACTIVITY_TYPES = [
   { value: "이동", icon: IconCar },
@@ -50,7 +51,7 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
 
-  // 방문지·식사·숙박·렌트카·기타 공통 (이동 제외)
+  // 이동 외 공통
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
 
@@ -69,7 +70,7 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
   const [returnTime, setReturnTime] = useState("");
   const [carModel, setCarModel] = useState("");
 
-  // 라벨 · placeholder
+  /* ─── 라벨 · placeholder ────────────────────────────────── */
   const getNameLabel = () => {
     if (type === "식사") return "식당명";
     if (type === "숙박") return "숙소명";
@@ -84,10 +85,7 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
     if (type === "렌트카") return "예: SK렌터카 강릉점";
     return "예: 서핑 강습";
   };
-  const getLocationLabel = () => {
-    if (type === "렌트카") return "대여점 위치";
-    return "위치";
-  };
+  const getLocationLabel = () => (type === "렌트카" ? "대여점 위치" : "위치");
   const getTimeLabel = () => {
     if (type === "이동") return "출발 시각";
     if (type === "숙박") return "체크인 시각";
@@ -100,7 +98,7 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
     return "날짜";
   };
 
-  // 체크아웃/반납 날짜 자동 계산 표시용
+  /* ─── 체크아웃/반납 날짜 자동 계산 ──────────────────────── */
   const getComputedEndDate = (n) => {
     if (!date || !n || Number(n) < 1) return "";
     const d = new Date(date);
@@ -121,11 +119,9 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
         alert("출발지와 도착지를 입력하세요");
         return;
       }
-    } else {
-      if (!name.trim()) {
-        alert("이름을 입력하세요");
-        return;
-      }
+    } else if (!name.trim()) {
+      alert("이름을 입력하세요");
+      return;
     }
 
     const base = {
@@ -179,190 +175,102 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
       };
     } else {
       // 방문지, 기타
-      payload = {
-        ...base,
-        name,
-        location,
-        rating,
-      };
+      payload = { ...base, name, location, rating };
     }
 
     onAdd(payload);
   };
 
-  // 스타일
-  const inputStyle = {
-    background: "#FFFFFF",
-    border: "0.5px solid #E8E4D8",
-    color: "#1E2A38",
-    fontSize: "14px",
-  };
-  const labelStyle = {
-    color: "#7A8CA0",
-    fontSize: "11px",
-    letterSpacing: "0.5px",
-  };
-  const chipStyle = (isActive) => ({
-    background: isActive ? "#1E2A38" : "#EDE8DA",
-    color: isActive ? "#FFFFFF" : "#3A4A5C",
-    fontSize: "12px",
-    fontWeight: 500,
-    padding: "5px 11px",
-    borderRadius: "999px",
-    transition: "background-color 150ms",
-  });
-  const smallHintStyle = {
-    color: "#7A8CA0",
-    fontSize: "11px",
-    marginTop: "4px",
-  };
-
   return (
-    <div
-      className="rounded-xl p-4 mb-3"
-      style={{
-        background: "#FFFFFF",
-        border: "0.5px solid #E8E4D8",
-      }}
-    >
-      <h3
-        className="font-medium mb-3"
-        style={{ color: "#1E2A38", fontSize: "14px" }}
-      >
-        새 일정 추가
-      </h3>
+    <Card padding="md" className="mb-3">
+      <h3 className="text-sm font-medium text-text mb-3">새 일정 추가</h3>
 
       <div className="space-y-3">
-        {/* 타입 선택 */}
+        {/* ============ 타입 선택 ============ */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
-            종류
-          </label>
+          <Label>종류</Label>
           <div className="flex flex-wrap gap-2">
             {ACTIVITY_TYPES.map((t) => {
               const Icon = t.icon;
-              const isActive = type === t.value;
               return (
-                <button
+                <Chip
                   key={t.value}
+                  variant={type === t.value ? "selected" : "default"}
                   onClick={() => setType(t.value)}
-                  className="flex items-center gap-1.5"
-                  style={chipStyle(isActive)}
+                  icon={<Icon size={14} />}
                 >
-                  <Icon size={13} />
                   {t.value}
-                </button>
+                </Chip>
               );
             })}
           </div>
         </div>
 
-        {/* ============ 이동 전용 필드 ============ */}
+        {/* ============ 이동 전용 ============ */}
         {type === "이동" && (
           <>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block mb-1.5" style={labelStyle}>
-                  출발지
-                </label>
-                <input
-                  type="text"
+                <Label>출발지</Label>
+                <Input
                   value={origin}
                   onChange={(e) => setOrigin(e.target.value)}
                   placeholder="예: 서울"
-                  className="w-full px-3 py-2 rounded-md focus:outline-none"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
                 />
               </div>
               <div>
-                <label className="block mb-1.5" style={labelStyle}>
-                  도착지
-                </label>
-                <input
-                  type="text"
+                <Label>도착지</Label>
+                <Input
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   placeholder="예: 강릉"
-                  className="w-full px-3 py-2 rounded-md focus:outline-none"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
                 />
               </div>
             </div>
 
-            {/* 이동 수단 */}
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                이동 수단
-              </label>
+              <Label>이동 수단</Label>
               <div className="flex flex-wrap gap-2">
                 {TRANSPORT_OPTIONS.map((t) => {
                   const Icon = t.icon;
                   return (
-                    <button
+                    <Chip
                       key={t.value}
+                      variant={transport === t.value ? "selected" : "default"}
                       onClick={() => setTransport(t.value)}
-                      className="flex items-center gap-1.5"
-                      style={chipStyle(transport === t.value)}
+                      icon={<Icon size={14} />}
                     >
-                      <Icon size={13} />
                       {t.value}
-                    </button>
+                    </Chip>
                   );
                 })}
               </div>
             </div>
 
-            {/* 소요 시간 */}
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                소요 시간
-              </label>
+              <Label>소요 시간</Label>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="number"
                   value={durationHours}
                   onChange={(e) => setDurationHours(e.target.value)}
                   placeholder="0"
                   min="0"
-                  className="w-16 px-3 py-2 rounded-md focus:outline-none text-center"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
+                  size="sm"
+                  className="w-16 text-center"
                 />
-                <span style={{ color: "#7A8CA0", fontSize: "12px" }}>시간</span>
-                <input
+                <span className="text-xs text-text-muted">시간</span>
+                <Input
                   type="number"
                   value={durationMinutes}
                   onChange={(e) => setDurationMinutes(e.target.value)}
                   placeholder="0"
                   min="0"
                   max="59"
-                  className="w-16 px-3 py-2 rounded-md focus:outline-none text-center"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
+                  size="sm"
+                  className="w-16 text-center"
                 />
-                <span style={{ color: "#7A8CA0", fontSize: "12px" }}>분</span>
+                <span className="text-xs text-text-muted">분</span>
               </div>
             </div>
           </>
@@ -372,50 +280,30 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
         {type !== "이동" && (
           <>
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                {getNameLabel()}
-              </label>
-              <input
-                type="text"
+              <Label>{getNameLabel()}</Label>
+              <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={getNamePlaceholder()}
-                className="w-full px-3 py-2 rounded-md focus:outline-none"
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-                onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
               />
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                {getLocationLabel()}
-              </label>
+              <Label>{getLocationLabel()}</Label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="예: 강원도 강릉시 창해로 123"
-                  className="flex-1 px-3 py-2 rounded-md focus:outline-none"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
-                />
+                <div className="flex-1">
+                  <Input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="예: 강원도 강릉시 창해로 123"
+                  />
+                </div>
                 <button
                   type="button"
-                  className="rounded-md px-2 flex items-center justify-center"
-                  style={{
-                    background: "#EDE8DA",
-                    color: "#7A8CA0",
-                    border: "0.5px solid #E8E4D8",
-                  }}
-                  title="위치 검색 (준비 중)"
                   disabled
+                  aria-label="위치 검색 (준비 중)"
+                  title="위치 검색 (준비 중)"
+                  className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted border border-border disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <IconLocationSearch size={18} />
                 </button>
@@ -428,100 +316,79 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
         {type === "식사" && (
           <>
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                시간대
-              </label>
+              <Label>시간대</Label>
               <div className="flex flex-wrap gap-2">
                 {MEAL_TYPES.map((m) => (
-                  <button
+                  <Chip
                     key={m}
+                    variant={mealType === m ? "selected" : "default"}
                     onClick={() => setMealType(m === mealType ? "" : m)}
-                    style={chipStyle(mealType === m)}
                   >
                     {m}
-                  </button>
+                  </Chip>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                음식 분류 (여러 개 선택 가능)
-              </label>
+              <Label>음식 분류 (여러 개 선택 가능)</Label>
               <div className="flex flex-wrap gap-2">
                 {CUISINES.map((c) => (
-                  <button
+                  <Chip
                     key={c}
+                    variant={cuisines.includes(c) ? "selected" : "default"}
                     onClick={() => toggleFromArray(cuisines, c, setCuisines)}
-                    style={chipStyle(cuisines.includes(c))}
                   >
                     {c}
-                  </button>
+                  </Chip>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                종류
-              </label>
+              <Label>종류</Label>
               <div className="flex flex-wrap gap-2">
                 {FOOD_TYPES.map((f) => (
-                  <button
+                  <Chip
                     key={f}
+                    variant={foodTypes.includes(f) ? "selected" : "default"}
                     onClick={() => toggleFromArray(foodTypes, f, setFoodTypes)}
-                    style={chipStyle(foodTypes.includes(f))}
                   >
                     {f}
-                  </button>
+                  </Chip>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                자세한 종류
-              </label>
-              <input
-                type="text"
+              <Label>자세한 종류</Label>
+              <Input
                 value={foodDetails}
                 onChange={(e) => setFoodDetails(e.target.value)}
                 placeholder="예: 칼국수, 비빔밥 (쉼표로 구분)"
-                className="w-full px-3 py-2 rounded-md focus:outline-none"
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-                onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
               />
             </div>
           </>
         )}
 
-        {/* ============ 숙박 전용: 박수 + 체크아웃 시각 ============ */}
+        {/* ============ 숙박 전용 ============ */}
         {type === "숙박" && (
           <>
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                박 수
-              </label>
+              <Label>박 수</Label>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="number"
                   value={nights}
                   onChange={(e) => setNights(e.target.value)}
                   placeholder="1"
                   min="1"
-                  className="w-20 px-3 py-2 rounded-md focus:outline-none text-center"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
+                  size="sm"
+                  className="w-20 text-center"
                 />
-                <span style={{ color: "#7A8CA0", fontSize: "12px" }}>박</span>
+                <span className="text-xs text-text-muted">박</span>
                 {nights && Number(nights) >= 1 && date && (
-                  <span style={smallHintStyle}>
+                  <span className="text-xs text-text-muted">
                     체크아웃: {getComputedEndDate(nights)}
                   </span>
                 )}
@@ -529,17 +396,11 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                체크아웃 시각 (선택)
-              </label>
-              <input
+              <Label>체크아웃 시각 (선택)</Label>
+              <Input
                 type="time"
                 value={checkoutTime}
                 onChange={(e) => setCheckoutTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-md focus:outline-none"
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-                onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
               />
             </div>
           </>
@@ -549,44 +410,29 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
         {type === "렌트카" && (
           <>
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                차종 (선택)
-              </label>
-              <input
-                type="text"
+              <Label>차종 (선택)</Label>
+              <Input
                 value={carModel}
                 onChange={(e) => setCarModel(e.target.value)}
                 placeholder="예: 쏘렌토"
-                className="w-full px-3 py-2 rounded-md focus:outline-none"
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-                onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
               />
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                대여 기간
-              </label>
+              <Label>대여 기간</Label>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="number"
                   value={days}
                   onChange={(e) => setDays(e.target.value)}
                   placeholder="1"
                   min="1"
-                  className="w-20 px-3 py-2 rounded-md focus:outline-none text-center"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.border = "0.5px solid #3A4A5C")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.border = "0.5px solid #E8E4D8")
-                  }
+                  size="sm"
+                  className="w-20 text-center"
                 />
-                <span style={{ color: "#7A8CA0", fontSize: "12px" }}>일</span>
+                <span className="text-xs text-text-muted">일</span>
                 {days && Number(days) >= 1 && date && (
-                  <span style={smallHintStyle}>
+                  <span className="text-xs text-text-muted">
                     반납: {getComputedEndDate(days)}
                   </span>
                 )}
@@ -594,17 +440,11 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
             </div>
 
             <div>
-              <label className="block mb-1.5" style={labelStyle}>
-                반납 시각 (선택)
-              </label>
-              <input
+              <Label>반납 시각 (선택)</Label>
+              <Input
                 type="time"
                 value={returnTime}
                 onChange={(e) => setReturnTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-md focus:outline-none"
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-                onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
               />
             </div>
           </>
@@ -613,125 +453,71 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
         {/* ============ 날짜 · 시간 (공통) ============ */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block mb-1.5" style={labelStyle}>
-              {getDateLabel()}
-            </label>
-            <input
+            <Label>{getDateLabel()}</Label>
+            <Input
               type="date"
               value={date}
               min={tripStartDate}
               max={tripEndDate}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-md focus:outline-none"
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-              onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
             />
           </div>
           <div>
-            <label className="block mb-1.5" style={labelStyle}>
-              {getTimeLabel()}
-            </label>
-            <input
+            <Label>{getTimeLabel()}</Label>
+            <Input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="w-full px-3 py-2 rounded-md focus:outline-none"
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-              onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
             />
           </div>
         </div>
 
         {/* ============ 비용 (공통) ============ */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
+          <Label>
             {type === "숙박" || type === "렌트카"
               ? "총 비용 (원)"
               : "비용 (원)"}
-          </label>
-          <input
+          </Label>
+          <Input
             type="number"
             value={cost}
             onChange={(e) => setCost(e.target.value)}
             placeholder="0"
-            className="w-full px-3 py-2 rounded-md focus:outline-none"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
           />
         </div>
 
         {/* ============ 평점 (이동 제외) ============ */}
         {type !== "이동" && (
           <div>
-            <label className="block mb-1.5" style={labelStyle}>
-              평점
-            </label>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star === rating ? 0 : star)}
-                  className="text-2xl transition-opacity"
-                  style={{
-                    color: star <= rating ? "#B08D5C" : "#E8E4D8",
-                  }}
-                >
-                  ◆
-                </button>
-              ))}
-            </div>
+            <Label>평점</Label>
+            <Rating value={rating} onChange={setRating} size="lg" />
           </div>
         )}
 
         {/* ============ 메모 (공통) ============ */}
         <div>
-          <label className="block mb-1.5" style={labelStyle}>
-            메모
-          </label>
-          <textarea
+          <Label>메모</Label>
+          <Textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="선택 사항"
             rows={2}
-            className="w-full px-3 py-2 rounded-md focus:outline-none resize-none"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.border = "0.5px solid #3A4A5C")}
-            onBlur={(e) => (e.target.style.border = "0.5px solid #E8E4D8")}
+            className="resize-none"
           />
         </div>
 
         {/* ============ 버튼 ============ */}
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={onCancel}
-            className="flex-1 font-medium py-2.5 rounded-lg"
-            style={{
-              background: "#EDE8DA",
-              color: "#3A4A5C",
-              fontSize: "13px",
-            }}
-          >
+          <Button variant="secondary" onClick={onCancel} fullWidth>
             취소
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="flex-1 font-medium py-2.5 rounded-lg transition-opacity"
-            style={{
-              background: "#1E2A38",
-              color: "#FFFFFF",
-              fontSize: "13px",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-          >
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} fullWidth>
             추가
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 

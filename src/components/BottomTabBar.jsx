@@ -11,125 +11,69 @@ function BottomTabBar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 상세 페이지에서는 탭바 숨김 (선택 사항, 시안엔 없음)
-  // 지금은 항상 표시로 진행
-
-  // 활성 탭 판정
   const isActive = (path) => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
   };
 
-  // 활성 색 · 비활성 색
-  const activeColor = "#1E2A38";
-  const inactiveColor = "#A8B4C4";
-
-  // FAB 클릭: 홈으로 이동하고 폼에 포커스
-  // (지금은 그냥 홈으로 이동)
   const handleFabClick = () => {
     navigate("/");
-    // 나중에 폼에 자동 포커스 추가 가능
+    // 나중에 폼 자동 포커스 추가 가능
   };
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0"
-      style={{
-        background: "#FAF9F5",
-        borderTop: "0.5px solid #E8E4D8",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-    >
-      <div
-        className="max-w-2xl mx-auto flex justify-around items-center relative"
-        style={{ height: "56px", padding: "0 16px" }}
-      >
-        {/* 홈 */}
-        <Link to="/" className="flex flex-col items-center gap-1">
-          <IconHome
-            size={22}
-            color={isActive("/") ? activeColor : inactiveColor}
-          />
-          <span
-            className="font-medium"
-            style={{
-              fontSize: "10px",
-              color: isActive("/") ? activeColor : inactiveColor,
-            }}
-          >
-            홈
-          </span>
-        </Link>
-
-        {/* 즐겨찾기 */}
-        <Link to="/favorites" className="flex flex-col items-center gap-1">
-          <IconStar
-            size={22}
-            color={isActive("/favorites") ? activeColor : inactiveColor}
-          />
-          <span
-            className="font-medium"
-            style={{
-              fontSize: "10px",
-              color: isActive("/favorites") ? activeColor : inactiveColor,
-            }}
-          >
-            즐겨찾기
-          </span>
-        </Link>
+    <nav className="fixed bottom-0 left-0 right-0 bg-bg border-t border-border pb-[env(safe-area-inset-bottom)]">
+      <div className="max-w-2xl mx-auto flex justify-around items-center relative h-14 px-4">
+        <TabLink to="/" icon={IconHome} label="홈" active={isActive("/")} />
+        <TabLink
+          to="/favorites"
+          icon={IconStar}
+          label="즐겨찾기"
+          active={isActive("/favorites")}
+        />
 
         {/* FAB (중앙) */}
         <button
+          type="button"
           onClick={handleFabClick}
-          className="rounded-full flex items-center justify-center"
-          style={{
-            width: "48px",
-            height: "48px",
-            background: "#1E2A38",
-            color: "#FFFFFF",
-            marginTop: "-16px",
-            boxShadow: "0 4px 12px rgba(30,42,56,0.2)",
-          }}
-          title="새 여행 추가"
+          aria-label="새 여행 추가"
+          className="w-12 h-12 -mt-4 rounded-full flex items-center justify-center bg-accent text-accent-fg shadow-lg hover:opacity-90 active:opacity-80 transition-opacity"
         >
           <IconPlus size={22} />
         </button>
 
-        {/* 통계 */}
-        <Link to="/stats" className="flex flex-col items-center gap-1">
-          <IconChartBar
-            size={22}
-            color={isActive("/stats") ? activeColor : inactiveColor}
-          />
-          <span
-            className="font-medium"
-            style={{
-              fontSize: "10px",
-              color: isActive("/stats") ? activeColor : inactiveColor,
-            }}
-          >
-            통계
-          </span>
-        </Link>
-
-        {/* 나 */}
-        <Link to="/profile" className="flex flex-col items-center gap-1">
-          <IconUser
-            size={22}
-            color={isActive("/profile") ? activeColor : inactiveColor}
-          />
-          <span
-            className="font-medium"
-            style={{
-              fontSize: "10px",
-              color: isActive("/profile") ? activeColor : inactiveColor,
-            }}
-          >
-            나
-          </span>
-        </Link>
+        <TabLink
+          to="/stats"
+          icon={IconChartBar}
+          label="통계"
+          active={isActive("/stats")}
+        />
+        <TabLink
+          to="/profile"
+          icon={IconUser}
+          label="나"
+          active={isActive("/profile")}
+        />
       </div>
     </nav>
+  );
+}
+
+/**
+ * 개별 탭 링크. 4개 탭이 동일 구조라 서브컴포넌트로 추출.
+ * 아이콘은 currentColor 상속 (Tabler 기본 동작).
+ */
+function TabLink({ to, icon: Icon, label, active }) {
+  return (
+    <Link
+      to={to}
+      className={`flex flex-col items-center gap-1 transition-colors ${
+        active ? "text-text" : "text-text-subtle"
+      }`}
+    >
+      <Icon size={22} />
+      <span className="text-[10px] font-medium">{label}</span>
+    </Link>
   );
 }
 
