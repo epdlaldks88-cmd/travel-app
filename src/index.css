@@ -18,6 +18,8 @@
   --color-success: var(--color-success);
   --color-hero-from: var(--color-hero-from);
   --color-hero-to: var(--color-hero-to);
+  --font-heading: var(--font-heading);
+  --font-body: var(--font-body);
 }
 
 /* ─── Global: 배경/텍스트에 테마 색상 적용 + 부드러운 전환 ── */
@@ -25,6 +27,7 @@ html,
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
+  font-family: var(--font-body);
   transition:
     background-color 200ms ease,
     color 200ms ease;

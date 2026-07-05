@@ -14,12 +14,17 @@ function ProfilePage() {
     <div>
       {/* ─── 헤더 ─────────────────────────────────────── */}
       <header className="mb-6 pt-4">
-        <h1 className="text-xl font-medium text-text tracking-tight">나</h1>
+        <h1 className="font-heading text-xl font-medium text-text tracking-tight">
+          나
+        </h1>
         <p className="text-xs text-text-muted mt-1 tracking-wide">환경 설정</p>
       </header>
 
       {/* ─── 테마 섹션 ─────────────────────────────────── */}
       <ThemeSection />
+
+      {/* ─── 폰트 섹션 ─────────────────────────────────── */}
+      <FontSection />
 
       {/* ─── 데이터 관리 섹션 ───────────────────────────── */}
       <DataSection />
@@ -147,6 +152,63 @@ function PaletteCircle({ color, className = "" }) {
       ].join(" ")}
       style={{ background: color }}
     />
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   폰트 섹션
+   ═══════════════════════════════════════════════════════════ */
+
+function FontSection() {
+  const { font, fontKey, setFont, allFonts } = useTheme();
+
+  return (
+    <Section title="폰트" className="mb-6">
+      <div className="grid grid-cols-2 gap-2">
+        {allFonts.map((f) => (
+          <FontCard
+            key={f.key}
+            font={f}
+            selected={f.key === fontKey}
+            onClick={() => setFont(f.key)}
+          />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function FontCard({ font, selected, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "p-3 rounded-xl border-2 text-left transition-colors bg-surface",
+        selected ? "border-accent" : "border-border hover:border-border-strong",
+      ].join(" ")}
+    >
+      {/* 실제 폰트로 렌더된 프리뷰 */}
+      <div className="mb-2 min-h-[3.5rem]">
+        <p
+          style={{ fontFamily: font.heading }}
+          className="text-lg text-text leading-tight"
+        >
+          강릉 여행
+        </p>
+        <p
+          style={{ fontFamily: font.body }}
+          className="text-xs text-text-muted mt-1"
+        >
+          Trip · 소중한 기억
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-text">{font.label}</span>
+        {selected && <IconCheck size={16} className="text-accent" />}
+      </div>
+    </button>
   );
 }
 

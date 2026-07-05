@@ -1,4 +1,4 @@
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowLeft } from "@tabler/icons-react";
 
 /**
  * PageHeader
@@ -19,24 +19,24 @@ export default function PageHeader({
   onBack,
   action,
   sticky = false,
-  className = '',
+  className = "",
   ...rest
 }) {
   const handleBack = () => {
     if (onBack) return onBack();
-    if (typeof window !== 'undefined') window.history.back();
+    if (typeof window !== "undefined") window.history.back();
   };
 
   return (
     <header
       className={[
-        'w-full bg-bg border-b border-border',
-        'flex items-center gap-2 px-4 h-14',
-        sticky ? 'sticky top-0 z-10' : '',
+        "w-full bg-bg border-b border-border",
+        "flex items-center gap-2 px-4 h-14",
+        sticky ? "sticky top-0 z-10" : "",
         className,
       ]
         .filter(Boolean)
-        .join(' ')}
+        .join(" ")}
       {...rest}
     >
       {back && (
@@ -49,7 +49,7 @@ export default function PageHeader({
           <IconArrowLeft size={22} />
         </button>
       )}
-      <h1 className="flex-1 min-w-0 truncate text-lg font-semibold text-text">
+      <h1 className="font-heading flex-1 min-w-0 truncate text-lg font-semibold text-text">
         {title}
       </h1>
       {action && <div className="shrink-0">{action}</div>}

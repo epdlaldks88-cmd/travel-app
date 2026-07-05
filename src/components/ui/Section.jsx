@@ -13,7 +13,7 @@ export default function Section({
   title,
   description,
   action,
-  className = '',
+  className = "",
   children,
   ...rest
 }) {
@@ -21,14 +21,14 @@ export default function Section({
 
   return (
     <section
-      className={['w-full', className].filter(Boolean).join(' ')}
+      className={["w-full", className].filter(Boolean).join(" ")}
       {...rest}
     >
       {hasHeader && (
         <div className="flex items-end justify-between gap-3 mb-3">
           <div className="min-w-0">
             {title && (
-              <h2 className="text-lg font-semibold text-text leading-tight">
+              <h2 className="font-heading text-lg font-semibold text-text leading-tight">
                 {title}
               </h2>
             )}
