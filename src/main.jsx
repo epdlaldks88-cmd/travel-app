@@ -1,13 +1,16 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { ThemeProvider } from "./theme/ThemeContext.jsx"; // ← 추가
+import { ThemeProvider } from "./theme/ThemeContext.jsx";
+import { AuthProvider } from "./lib/AuthContext.jsx";
 import App from "./App.jsx";
 import "./index.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </AuthProvider>
   </StrictMode>,
 );

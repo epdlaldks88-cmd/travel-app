@@ -1,81 +1,76 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { IconArrowLeft, IconCameraPlus, IconPlus } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconCameraPlus,
+  IconPlus,
+  IconLoader2,
+} from "@tabler/icons-react";
 import ActivityForm from "../components/ActivityForm";
 import ActivityItem from "../components/ActivityItem";
 import { Button, Card, Rating, Textarea } from "../components/ui";
+import {
+  useTrip,
+  useActivities,
+  useUpdateTrip,
+  useCreateActivity,
+  useDeleteActivity,
+} from "../data/hooks";
 
 function TripDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [trip, setTrip] = useState(null);
+  const trip = useTrip(id);
+  const activities = useActivities(id);
+
+  const updateTrip = useUpdateTrip();
+  const createActivity = useCreateActivity();
+  const deleteActivity = useDeleteActivity();
+
   const [memo, setMemo] = useState("");
   const [rating, setRating] = useState(0);
-  const [activities, setActivities] = useState([]);
   const [showActivityForm, setShowActivityForm] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // 처음 불러오기
+  // trip 로드/변경 시 memo, rating 로컬 상태 동기화
   useEffect(() => {
-    const saved = localStorage.getItem("trips");
-    if (!saved) return;
-
-    const trips = JSON.parse(saved);
-    const found = trips.find((t) => String(t.id) === id);
-
-    if (found) {
-      setTrip(found);
-      setMemo(found.memo || "");
-      setRating(found.rating || 0);
-      setActivities(found.activities || []);
+    if (trip) {
+      setMemo(trip.memo || "");
+      setRating(trip.rating || 0);
     }
-  }, [id]);
+  }, [trip?.id]);
 
-  // localStorage 갱신 헬퍼
-  const saveToStorage = (updates) => {
-    const saved = localStorage.getItem("trips");
-    const trips = saved ? JSON.parse(saved) : [];
-    const updated = trips.map((t) =>
-      String(t.id) === id ? { ...t, ...updates } : t,
-    );
-    localStorage.setItem("trips", JSON.stringify(updated));
-  };
-
-  const handleAddActivity = (newActivity) => {
-    const newActivities = [...activities, newActivity];
-    setActivities(newActivities);
-    saveToStorage({ activities: newActivities });
+  // ─── 핸들러 ──────────────────────────────────────────────
+  const handleAddActivity = async (data) => {
+    await createActivity(id, data);
     setShowActivityForm(false);
   };
 
-  const handleDeleteActivity = (activityId) => {
+  const handleDeleteActivity = async (activityId) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return;
-    const newActivities = activities.filter((a) => a.id !== activityId);
-    setActivities(newActivities);
-    saveToStorage({ activities: newActivities });
+    await deleteActivity(activityId);
   };
 
-  const handleSave = () => {
-    saveToStorage({ memo, rating });
-    alert("저장되었습니다");
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateTrip(id, { memo, rating });
+      alert("저장되었습니다");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const totalCost = activities.reduce((sum, a) => sum + (a.cost || 0), 0);
-
-  // 날짜순 → 시간순 정렬
-  const sortedActivities = [...activities].sort((a, b) => {
-    const dateA = a.date || "";
-    const dateB = b.date || "";
-    if (dateA !== dateB) return dateA.localeCompare(dateB);
-    const timeA = a.time || "";
-    const timeB = b.time || "";
-    return timeA.localeCompare(timeB);
-  });
-
-  const formatFull = (dateStr) => {
-    if (!dateStr) return "";
-    return dateStr.replaceAll("-", ".");
-  };
+  // ─── 로딩 · 미존재 ───────────────────────────────────────
+  // useLiveQuery 초기값 undefined = 로딩 중
+  if (trip === undefined) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <IconLoader2 size={24} className="animate-spin text-text-muted" />
+      </div>
+    );
+  }
 
   if (!trip) {
     return (
@@ -90,6 +85,13 @@ function TripDetailPage() {
       </div>
     );
   }
+
+  const totalCost = activities.reduce((sum, a) => sum + (a.cost || 0), 0);
+
+  const formatFull = (dateStr) => {
+    if (!dateStr) return "";
+    return dateStr.replaceAll("-", ".");
+  };
 
   return (
     // 페이지 상위에 적용된 p-4 를 무효화하여 히어로가 전폭 커버
@@ -116,7 +118,7 @@ function TripDetailPage() {
         </div>
 
         <div className="absolute bottom-4 left-4 right-4">
-          <h1 className="text-xl font-medium text-white tracking-tight">
+          <h1 className="font-heading text-xl font-medium text-white tracking-tight">
             {trip.title}
           </h1>
           <p className="text-xs text-white/85 mt-1">
@@ -150,7 +152,7 @@ function TripDetailPage() {
         {/* 일정 섹션 */}
         <section className="mb-4">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-sm font-medium text-text">
+            <h2 className="font-heading text-sm font-medium text-text">
               일정 ({activities.length})
             </h2>
             {!showActivityForm && (
@@ -169,6 +171,11 @@ function TripDetailPage() {
             <ActivityForm
               tripStartDate={trip.startDate}
               tripEndDate={trip.endDate}
+              previousActivityName={
+                activities.length > 0
+                  ? activities[activities.length - 1].name
+                  : null
+              }
               onAdd={handleAddActivity}
               onCancel={() => setShowActivityForm(false)}
             />
@@ -180,7 +187,7 @@ function TripDetailPage() {
             </Card>
           )}
 
-          {sortedActivities.map((activity) => (
+          {activities.map((activity) => (
             <ActivityItem
               key={activity.id}
               activity={activity}
@@ -191,13 +198,17 @@ function TripDetailPage() {
 
         {/* 전체 평점 */}
         <Card padding="md" className="mb-4">
-          <h2 className="text-sm font-medium text-text mb-3">전체 평점</h2>
+          <h2 className="font-heading text-sm font-medium text-text mb-3">
+            전체 평점
+          </h2>
           <Rating value={rating} onChange={setRating} size="lg" />
         </Card>
 
         {/* 한줄 회고 */}
         <Card padding="md" className="mb-4">
-          <h2 className="text-sm font-medium text-text mb-3">한줄 회고</h2>
+          <h2 className="font-heading text-sm font-medium text-text mb-3">
+            한줄 회고
+          </h2>
           <Textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
@@ -208,7 +219,13 @@ function TripDetailPage() {
         </Card>
 
         {/* 저장 버튼 */}
-        <Button variant="primary" onClick={handleSave} fullWidth size="lg">
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          fullWidth
+          size="lg"
+          loading={saving}
+        >
           평점 · 메모 저장하기
         </Button>
       </div>
@@ -216,10 +233,6 @@ function TripDetailPage() {
   );
 }
 
-/**
- * 통계 로우의 개별 셀 (일정/지출/평점).
- * highlight=true 면 값 텍스트를 accent 색으로.
- */
 function StatCell({ label, value, highlight }) {
   return (
     <div className="text-center flex-1">

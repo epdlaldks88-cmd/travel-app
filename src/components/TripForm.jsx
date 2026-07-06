@@ -46,7 +46,6 @@ function TripForm({ onAdd }) {
     }
 
     onAdd({
-      id: Date.now(),
       title,
       startDate,
       endDate,

@@ -12,39 +12,57 @@ import {
   IconWalk,
   IconRoute,
   IconCoin,
+  IconArrowNarrowRight,
 } from "@tabler/icons-react";
 import { Rating } from "./ui";
 
 const TYPE_ICONS = {
-  이동: IconCar,
-  방문지: IconMapPin,
-  식사: IconToolsKitchen2,
-  숙박: IconBuilding,
+  관광지: IconMapPin,
+  식당: IconToolsKitchen2,
+  숙소: IconBuilding,
   렌트카: IconSteeringWheel,
   기타: IconBookmark,
 };
 
 const TRANSPORT_ICONS = {
-  자동차: IconCar,
+  도보: IconWalk,
+  자차: IconCar,
+  택시: IconCar,
+  버스: IconBus,
+  지하철: IconTrain,
   기차: IconTrain,
   비행기: IconPlane,
-  버스: IconBus,
-  도보: IconWalk,
+  렌트카: IconSteeringWheel,
   기타: IconRoute,
 };
 
-const formatDuration = (hours, minutes) => {
+/**
+ * 소요 시간 포맷: "3시간 20분" / "3시간" / "20분" / null
+ */
+function formatDuration(hours, minutes) {
   const h = Number(hours) || 0;
   const m = Number(minutes) || 0;
   if (h === 0 && m === 0) return null;
   if (h > 0 && m > 0) return `${h}시간 ${m}분`;
   if (h > 0) return `${h}시간`;
   return `${m}분`;
-};
+}
 
 /**
- * 작은 텍스트 뱃지 (활동 카드 내 타입/이동수단/박수 표시용).
- * Chip 은 폼 선택용이라 오버스펙, 별도 서브컴포넌트로 유지.
+ * 이동 정보가 하나라도 있는지
+ */
+function hasMovementInfo(a) {
+  return (
+    a.origin ||
+    a.transport ||
+    (a.durationHours && Number(a.durationHours) > 0) ||
+    (a.durationMinutes && Number(a.durationMinutes) > 0) ||
+    (a.distanceKm && Number(a.distanceKm) > 0)
+  );
+}
+
+/**
+ * 파일 내 서브컴포넌트: 작은 텍스트 뱃지
  */
 function MiniBadge({ variant = "default", children }) {
   const variantMap = {
@@ -61,32 +79,27 @@ function MiniBadge({ variant = "default", children }) {
 }
 
 function ActivityItem({ activity, onDelete }) {
-  // 좌측 아이콘 결정 (이동은 이동수단별)
-  const Icon =
-    activity.type === "이동"
-      ? TRANSPORT_ICONS[activity.transport] || IconCar
-      : TYPE_ICONS[activity.type] || IconBookmark;
+  const Icon = TYPE_ICONS[activity.type] || IconBookmark;
+  const TransportIcon = activity.transport
+    ? TRANSPORT_ICONS[activity.transport]
+    : null;
 
-  const title =
-    activity.type === "이동"
-      ? `${activity.origin || "?"} → ${activity.destination || "?"}`
-      : activity.name;
+  const duration = formatDuration(
+    activity.durationHours,
+    activity.durationMinutes,
+  );
+  const hasMovement = hasMovementInfo(activity);
 
-  const duration =
-    activity.type === "이동"
-      ? formatDuration(activity.durationHours, activity.durationMinutes)
-      : null;
-
-  // 식사 태그 모음
+  // 식당 태그
   const mealTags = [];
-  if (activity.type === "식사") {
+  if (activity.type === "식당") {
     if (activity.mealType) mealTags.push(activity.mealType);
     if (activity.cuisines?.length) mealTags.push(...activity.cuisines);
     if (activity.foodTypes?.length) mealTags.push(...activity.foodTypes);
   }
 
   const nightsDisplay =
-    activity.type === "숙박" && activity.nights ? `${activity.nights}박` : null;
+    activity.type === "숙소" && activity.nights ? `${activity.nights}박` : null;
 
   const rentalDaysDisplay =
     activity.type === "렌트카" && activity.days ? `${activity.days}일` : null;
@@ -94,7 +107,7 @@ function ActivityItem({ activity, onDelete }) {
   return (
     <div className="bg-surface border border-border rounded-lg p-3 mb-2 relative">
       <div className="flex gap-3">
-        {/* ─── 좌측: 시간 · 아이콘 ─────────────────────── */}
+        {/* ─── 좌측: 시간 · 타입 아이콘 ────────────────── */}
         <div className="flex flex-col items-center gap-1 min-w-[42px]">
           {activity.time && (
             <span className="text-[11px] text-text-muted">{activity.time}</span>
@@ -109,43 +122,62 @@ function ActivityItem({ activity, onDelete }) {
           {/* 타입 · 부가 뱃지 · 별점 */}
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <MiniBadge>{activity.type}</MiniBadge>
-
-            {activity.type === "이동" && activity.transport && (
-              <MiniBadge variant="accent">{activity.transport}</MiniBadge>
-            )}
-
             {nightsDisplay && (
               <MiniBadge variant="accent">{nightsDisplay}</MiniBadge>
             )}
-
             {rentalDaysDisplay && (
               <MiniBadge variant="accent">{rentalDaysDisplay}</MiniBadge>
             )}
-
             {activity.rating > 0 && (
               <Rating value={activity.rating} readonly size="sm" />
             )}
           </div>
 
-          {/* 제목 */}
-          <h4 className="text-sm font-medium text-text">{title}</h4>
+          {/* 제목 (장소 이름) */}
+          <h4 className="font-heading text-sm font-medium text-text">
+            {activity.name}
+          </h4>
+
+          {/* ─── 이동 정보 (한 블록) ─────────────────── */}
+          {hasMovement && (
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap text-[11px] text-text-muted">
+              {activity.origin && (
+                <>
+                  <span className="text-text">{activity.origin}</span>
+                  <IconArrowNarrowRight
+                    size={12}
+                    className="text-text-subtle"
+                  />
+                </>
+              )}
+              {TransportIcon && <TransportIcon size={12} />}
+              {activity.transport && <span>{activity.transport}</span>}
+              {duration && (
+                <>
+                  {activity.transport && (
+                    <span className="text-text-subtle">·</span>
+                  )}
+                  <span>{duration}</span>
+                </>
+              )}
+              {activity.distanceKm > 0 && (
+                <>
+                  <span className="text-text-subtle">·</span>
+                  <span>{activity.distanceKm}km</span>
+                </>
+              )}
+            </div>
+          )}
 
           {/* 차종 (렌트카) */}
           {activity.type === "렌트카" && activity.carModel && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-0.5">
+            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-1">
               <IconCar size={11} />
               {activity.carModel}
             </p>
           )}
 
-          {/* 소요 시간 (이동) */}
-          {duration && (
-            <p className="text-[11px] text-text-muted mt-0.5">
-              소요 {duration}
-            </p>
-          )}
-
-          {/* 식사 태그 */}
+          {/* 식당 태그 */}
           {mealTags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {mealTags.map((tag, i) => (
@@ -159,8 +191,8 @@ function ActivityItem({ activity, onDelete }) {
             </div>
           )}
 
-          {/* 식사 세부 */}
-          {activity.type === "식사" && activity.foodDetails && (
+          {/* 식당 세부 */}
+          {activity.type === "식당" && activity.foodDetails && (
             <p className="inline-flex items-center gap-1 text-[11px] text-text mt-1">
               <IconToolsKitchen2 size={11} />
               {activity.foodDetails}
@@ -169,14 +201,14 @@ function ActivityItem({ activity, onDelete }) {
 
           {/* 위치 */}
           {activity.location && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-0.5">
+            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-1">
               <IconMapPin size={11} />
               {activity.location}
             </p>
           )}
 
-          {/* 체크아웃 (숙박) */}
-          {activity.type === "숙박" && activity.checkoutTime && (
+          {/* 체크아웃 (숙소) */}
+          {activity.type === "숙소" && activity.checkoutTime && (
             <p className="text-[11px] text-text-muted mt-0.5">
               체크아웃 {activity.checkoutTime}
             </p>

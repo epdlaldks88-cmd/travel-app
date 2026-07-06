@@ -1,12 +1,12 @@
 import { useState } from "react";
 import {
-  IconCar,
   IconMapPin,
   IconToolsKitchen2,
   IconBuilding,
+  IconSteeringWheel,
   IconBookmark,
   IconLocationSearch,
-  IconSteeringWheel,
+  IconCar,
   IconTrain,
   IconPlane,
   IconBus,
@@ -16,26 +16,42 @@ import {
 import { CUISINES, FOOD_TYPES, MEAL_TYPES } from "../data/foods";
 import { Button, Card, Chip, Input, Textarea, Label, Rating } from "./ui";
 
+/**
+ * type: 장소 카테고리 5개
+ * "이동" 타입 폐기. 이동 정보는 모든 활동의 공통 속성.
+ */
 const ACTIVITY_TYPES = [
-  { value: "이동", icon: IconCar },
-  { value: "방문지", icon: IconMapPin },
-  { value: "식사", icon: IconToolsKitchen2 },
-  { value: "숙박", icon: IconBuilding },
+  { value: "관광지", icon: IconMapPin },
+  { value: "식당", icon: IconToolsKitchen2 },
+  { value: "숙소", icon: IconBuilding },
   { value: "렌트카", icon: IconSteeringWheel },
   { value: "기타", icon: IconBookmark },
 ];
 
+/**
+ * 이동수단 9개.
+ * 지하철/기차 아이콘은 IconTrain 공용 (Tabler 에 지하철 전용 없음).
+ */
 const TRANSPORT_OPTIONS = [
-  { value: "자동차", icon: IconCar },
+  { value: "도보", icon: IconWalk },
+  { value: "자차", icon: IconCar },
+  { value: "택시", icon: IconCar },
+  { value: "버스", icon: IconBus },
+  { value: "지하철", icon: IconTrain },
   { value: "기차", icon: IconTrain },
   { value: "비행기", icon: IconPlane },
-  { value: "버스", icon: IconBus },
-  { value: "도보", icon: IconWalk },
+  { value: "렌트카", icon: IconSteeringWheel },
   { value: "기타", icon: IconRoute },
 ];
 
-function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
-  const [type, setType] = useState("방문지");
+function ActivityForm({
+  tripStartDate,
+  tripEndDate,
+  previousActivityName,
+  onAdd,
+  onCancel,
+}) {
+  const [type, setType] = useState("관광지");
 
   // 공통
   const [date, setDate] = useState(tripStartDate || "");
@@ -44,24 +60,24 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
   const [memo, setMemo] = useState("");
   const [rating, setRating] = useState(0);
 
-  // 이동 전용
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [transport, setTransport] = useState("자동차");
-  const [durationHours, setDurationHours] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState("");
-
-  // 이동 외 공통
+  // 장소 (공통)
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
 
-  // 식사 전용
+  // 이동 정보 (공통)
+  const [origin, setOrigin] = useState("");
+  const [transport, setTransport] = useState("");
+  const [durationHours, setDurationHours] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [distanceKm, setDistanceKm] = useState("");
+
+  // 식당 전용
   const [mealType, setMealType] = useState("");
   const [cuisines, setCuisines] = useState([]);
   const [foodTypes, setFoodTypes] = useState([]);
   const [foodDetails, setFoodDetails] = useState("");
 
-  // 숙박 전용
+  // 숙소 전용
   const [nights, setNights] = useState("");
   const [checkoutTime, setCheckoutTime] = useState("");
 
@@ -70,35 +86,33 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
   const [returnTime, setReturnTime] = useState("");
   const [carModel, setCarModel] = useState("");
 
-  /* ─── 라벨 · placeholder ────────────────────────────────── */
+  /* ─── type별 라벨/placeholder ─────────────────────────── */
   const getNameLabel = () => {
-    if (type === "식사") return "식당명";
-    if (type === "숙박") return "숙소명";
-    if (type === "방문지") return "장소명";
+    if (type === "식당") return "식당명";
+    if (type === "숙소") return "숙소명";
+    if (type === "관광지") return "장소명";
     if (type === "렌트카") return "업체명";
     return "이름";
   };
   const getNamePlaceholder = () => {
-    if (type === "식사") return "예: 옛맛 칼국수";
-    if (type === "숙박") return "예: 강릉 오션뷰 호텔";
-    if (type === "방문지") return "예: 안목해변";
+    if (type === "식당") return "예: 옛맛 칼국수";
+    if (type === "숙소") return "예: 강릉 오션뷰 호텔";
+    if (type === "관광지") return "예: 안목해변";
     if (type === "렌트카") return "예: SK렌터카 강릉점";
     return "예: 서핑 강습";
   };
   const getLocationLabel = () => (type === "렌트카" ? "대여점 위치" : "위치");
   const getTimeLabel = () => {
-    if (type === "이동") return "출발 시각";
-    if (type === "숙박") return "체크인 시각";
+    if (type === "숙소") return "체크인 시각";
     if (type === "렌트카") return "대여 시각";
     return "시간";
   };
   const getDateLabel = () => {
-    if (type === "숙박") return "체크인 날짜";
+    if (type === "숙소") return "체크인 날짜";
     if (type === "렌트카") return "대여 날짜";
     return "날짜";
   };
 
-  /* ─── 체크아웃/반납 날짜 자동 계산 ──────────────────────── */
   const getComputedEndDate = (n) => {
     if (!date || !n || Number(n) < 1) return "";
     const d = new Date(date);
@@ -113,69 +127,45 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
   };
 
   const handleSubmit = () => {
-    // 타입별 검증
-    if (type === "이동") {
-      if (!origin.trim() || !destination.trim()) {
-        alert("출발지와 도착지를 입력하세요");
-        return;
-      }
-    } else if (!name.trim()) {
+    if (!name.trim()) {
       alert("이름을 입력하세요");
       return;
     }
 
     const base = {
-      id: Date.now(),
       type,
       date,
       time,
       cost: cost ? Number(cost) : 0,
       memo,
+      rating,
+      // 장소
+      name,
+      location,
+      // 이동 정보
+      origin,
+      transport,
+      durationHours: durationHours ? Number(durationHours) : 0,
+      durationMinutes: durationMinutes ? Number(durationMinutes) : 0,
+      distanceKm: distanceKm ? Number(distanceKm) : null,
     };
 
-    let payload;
-    if (type === "이동") {
+    let payload = base;
+    if (type === "식당") {
+      payload = { ...base, mealType, cuisines, foodTypes, foodDetails };
+    } else if (type === "숙소") {
       payload = {
         ...base,
-        origin,
-        destination,
-        transport,
-        durationHours: durationHours ? Number(durationHours) : 0,
-        durationMinutes: durationMinutes ? Number(durationMinutes) : 0,
-      };
-    } else if (type === "식사") {
-      payload = {
-        ...base,
-        name,
-        location,
-        rating,
-        mealType,
-        cuisines,
-        foodTypes,
-        foodDetails,
-      };
-    } else if (type === "숙박") {
-      payload = {
-        ...base,
-        name,
-        location,
-        rating,
         nights: nights ? Number(nights) : 1,
         checkoutTime,
       };
     } else if (type === "렌트카") {
       payload = {
         ...base,
-        name,
-        location,
-        rating,
         days: days ? Number(days) : 1,
         returnTime,
         carModel,
       };
-    } else {
-      // 방문지, 기타
-      payload = { ...base, name, location, rating };
     }
 
     onAdd(payload);
@@ -206,26 +196,56 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
           </div>
         </div>
 
-        {/* ============ 이동 전용 ============ */}
-        {type === "이동" && (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>출발지</Label>
-                <Input
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
-                  placeholder="예: 서울"
-                />
-              </div>
-              <div>
-                <Label>도착지</Label>
-                <Input
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  placeholder="예: 강릉"
-                />
-              </div>
+        {/* ============ 이름 · 위치 (공통) ============ */}
+        <div>
+          <Label>{getNameLabel()}</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={getNamePlaceholder()}
+          />
+        </div>
+
+        <div>
+          <Label>{getLocationLabel()}</Label>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="예: 강원도 강릉시 창해로 123"
+              />
+            </div>
+            <button
+              type="button"
+              disabled
+              aria-label="위치 검색 (준비 중)"
+              title="위치 검색 (준비 중)"
+              className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <IconLocationSearch size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* ============ 이동 정보 (공통, 선택) ============ */}
+        <div className="pt-2 border-t border-border">
+          <p className="text-xs text-text-muted mb-2 tracking-wide">
+            이동 정보 (선택)
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <Label>출발지</Label>
+              <Input
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                placeholder={
+                  previousActivityName
+                    ? `이전: ${previousActivityName}`
+                    : "예: 집, 서울역"
+                }
+              />
             </div>
 
             <div>
@@ -237,7 +257,9 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
                     <Chip
                       key={t.value}
                       variant={transport === t.value ? "selected" : "default"}
-                      onClick={() => setTransport(t.value)}
+                      onClick={() =>
+                        setTransport(t.value === transport ? "" : t.value)
+                      }
                       icon={<Icon size={14} />}
                     >
                       {t.value}
@@ -248,8 +270,8 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
             </div>
 
             <div>
-              <Label>소요 시간</Label>
-              <div className="flex items-center gap-2">
+              <Label>소요 시간 · 거리</Label>
+              <div className="flex items-center gap-2 flex-wrap">
                 <Input
                   type="number"
                   value={durationHours}
@@ -257,7 +279,7 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
                   placeholder="0"
                   min="0"
                   size="sm"
-                  className="w-16 text-center"
+                  className="w-14 text-center"
                 />
                 <span className="text-xs text-text-muted">시간</span>
                 <Input
@@ -268,53 +290,30 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
                   min="0"
                   max="59"
                   size="sm"
-                  className="w-16 text-center"
+                  className="w-14 text-center"
                 />
                 <span className="text-xs text-text-muted">분</span>
+                <Input
+                  type="number"
+                  value={distanceKm}
+                  onChange={(e) => setDistanceKm(e.target.value)}
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                  size="sm"
+                  className="w-16 text-center ml-1"
+                />
+                <span className="text-xs text-text-muted">km</span>
               </div>
             </div>
-          </>
-        )}
+          </div>
+        </div>
 
-        {/* ============ 이동 외 공통: 이름 · 위치 ============ */}
-        {type !== "이동" && (
-          <>
-            <div>
-              <Label>{getNameLabel()}</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={getNamePlaceholder()}
-              />
-            </div>
+        {/* ============ 식당 전용 ============ */}
+        {type === "식당" && (
+          <div className="pt-2 border-t border-border space-y-3">
+            <p className="text-xs text-text-muted tracking-wide">식당 정보</p>
 
-            <div>
-              <Label>{getLocationLabel()}</Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="예: 강원도 강릉시 창해로 123"
-                  />
-                </div>
-                <button
-                  type="button"
-                  disabled
-                  aria-label="위치 검색 (준비 중)"
-                  title="위치 검색 (준비 중)"
-                  className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted border border-border disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <IconLocationSearch size={18} />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ============ 식사 전용 ============ */}
-        {type === "식사" && (
-          <>
             <div>
               <Label>시간대</Label>
               <div className="flex flex-wrap gap-2">
@@ -368,12 +367,14 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
                 placeholder="예: 칼국수, 비빔밥 (쉼표로 구분)"
               />
             </div>
-          </>
+          </div>
         )}
 
-        {/* ============ 숙박 전용 ============ */}
-        {type === "숙박" && (
-          <>
+        {/* ============ 숙소 전용 ============ */}
+        {type === "숙소" && (
+          <div className="pt-2 border-t border-border space-y-3">
+            <p className="text-xs text-text-muted tracking-wide">숙소 정보</p>
+
             <div>
               <Label>박 수</Label>
               <div className="flex items-center gap-2">
@@ -403,12 +404,14 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
                 onChange={(e) => setCheckoutTime(e.target.value)}
               />
             </div>
-          </>
+          </div>
         )}
 
         {/* ============ 렌트카 전용 ============ */}
         {type === "렌트카" && (
-          <>
+          <div className="pt-2 border-t border-border space-y-3">
+            <p className="text-xs text-text-muted tracking-wide">렌트카 정보</p>
+
             <div>
               <Label>차종 (선택)</Label>
               <Input
@@ -447,11 +450,11 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
                 onChange={(e) => setReturnTime(e.target.value)}
               />
             </div>
-          </>
+          </div>
         )}
 
         {/* ============ 날짜 · 시간 (공통) ============ */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
           <div>
             <Label>{getDateLabel()}</Label>
             <Input
@@ -472,10 +475,10 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
           </div>
         </div>
 
-        {/* ============ 비용 (공통) ============ */}
+        {/* ============ 비용 · 평점 (공통) ============ */}
         <div>
           <Label>
-            {type === "숙박" || type === "렌트카"
+            {type === "숙소" || type === "렌트카"
               ? "총 비용 (원)"
               : "비용 (원)"}
           </Label>
@@ -487,15 +490,12 @@ function ActivityForm({ tripStartDate, tripEndDate, onAdd, onCancel }) {
           />
         </div>
 
-        {/* ============ 평점 (이동 제외) ============ */}
-        {type !== "이동" && (
-          <div>
-            <Label>평점</Label>
-            <Rating value={rating} onChange={setRating} size="lg" />
-          </div>
-        )}
+        <div>
+          <Label>평점</Label>
+          <Rating value={rating} onChange={setRating} size="lg" />
+        </div>
 
-        {/* ============ 메모 (공통) ============ */}
+        {/* ============ 메모 ============ */}
         <div>
           <Label>메모</Label>
           <Textarea
