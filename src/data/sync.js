@@ -5,6 +5,8 @@ import { fromSupabase, toSupabase } from "./mappers";
 /**
  * SyncWorker — Dexie ↔ Supabase 동기화.
  *
+ * v2 확장: accommodations, profile (home_*) 동기화 추가.
+ *
  * 재설계 (P0):
  *   1. start(): pending 큐 있으면 flush 먼저, 그 후 pull
  *   2. pull(): pending 있으면 스킵, clear 대신 bulkPut (병합)
@@ -112,6 +114,14 @@ class SyncWorker {
     }
 
     try {
+      // 프로필 (유저당 1개)
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", this.userId)
+        .maybeSingle();
+      if (profileErr) throw profileErr;
+
       const { data: trips, error: tripsErr } = await supabase
         .from("trips")
         .select("*");
@@ -132,20 +142,38 @@ class SyncWorker {
           : { data: [], error: null };
       if (notesErr) throw notesErr;
 
+      // 숙소 (신규)
+      const { data: accommodations, error: accErr } =
+        tripIds.length > 0
+          ? await supabase
+              .from("trip_accommodations")
+              .select("*")
+              .in("trip_id", tripIds)
+          : { data: [], error: null };
+      if (accErr) throw accErr;
+
       const activityEntities = (activities || []).map(fromSupabase);
       const dayNoteEntities = (dayNotes || []).map(fromSupabase);
+      const accommodationEntities = (accommodations || []).map(fromSupabase);
+      const profileEntity = profile ? fromSupabase(profile) : null;
 
       await db.transaction(
         "rw",
         db.trips,
         db.activities,
         db.day_notes,
+        db.accommodations,
+        db.profile,
         db.meta,
         async () => {
           // ⭐ clear 대신 bulkPut (upsert)
           await db.trips.bulkPut(tripEntities);
           await db.activities.bulkPut(activityEntities);
           await db.day_notes.bulkPut(dayNoteEntities);
+          await db.accommodations.bulkPut(accommodationEntities);
+          if (profileEntity) {
+            await db.profile.put(profileEntity);
+          }
           await db.meta.put({
             key: "lastPullAt",
             value: new Date().toISOString(),

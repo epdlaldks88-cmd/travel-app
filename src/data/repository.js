@@ -39,6 +39,10 @@ const NULLABLE_TIME_FIELDS = [
   "endDate",
   "wakeTime",
   "sleepTime",
+  "checkInDate",
+  "checkInTime",
+  "checkOutDate",
+  "checkOutTime",
 ];
 
 const NULLABLE_NUMBER_FIELDS = [
@@ -49,6 +53,9 @@ const NULLABLE_NUMBER_FIELDS = [
   "mood",
   "gpsLat",
   "gpsLng",
+  "totalCost",
+  "homeGpsLat",
+  "homeGpsLng",
 ];
 
 /**
@@ -263,4 +270,111 @@ export async function upsertDayNote(tripId, date, patch) {
 export async function deleteDayNote(id) {
   await db.day_notes.delete(id);
   await enqueue("day_notes", "delete", id, null);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Accommodation (v2 신규)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 여행별 숙소 목록 (Dexie에서만 조회 — sync는 백그라운드).
+ */
+export async function listAccommodations(tripId) {
+  return db.accommodations.where("tripId").equals(tripId).toArray();
+}
+
+/**
+ * 신규 숙소 생성.
+ * @param {string} tripId
+ * @param {string} ownerId
+ * @param {object} data
+ */
+export async function createAccommodation(tripId, ownerId, data) {
+  const timestamp = now();
+  const entity = normalizeForSync({
+    id: newId(),
+    tripId,
+    ownerId,
+    name: data.name,
+    location: data.location || "",
+    gpsLat: data.gpsLat ?? null,
+    gpsLng: data.gpsLng ?? null,
+    checkInDate: data.checkInDate || null,
+    checkInTime: data.checkInTime || null,
+    checkOutDate: data.checkOutDate || null,
+    checkOutTime: data.checkOutTime || null,
+    nights: data.nights ?? 1,
+    totalCost: data.totalCost || 0,
+    rating: data.rating ?? null,
+    memo: data.memo || "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  await db.accommodations.add(entity);
+  await enqueue("trip_accommodations", "insert", entity.id, entity);
+  return entity;
+}
+
+export async function updateAccommodation(id, patch) {
+  const timestamp = now();
+  const normalized = normalizeForSync({ ...patch, updatedAt: timestamp });
+  await db.accommodations.update(id, normalized);
+  const entity = await db.accommodations.get(id);
+  if (entity) {
+    await enqueue(
+      "trip_accommodations",
+      "update",
+      id,
+      normalizeForSync(entity),
+    );
+  }
+  return entity;
+}
+
+export async function deleteAccommodation(id) {
+  await db.transaction("rw", db.accommodations, db.activities, async () => {
+    // 이 숙소를 참조하는 activities.accommodationId를 null로 (로컬 캐시 즉시 반영)
+    // 서버는 ON DELETE SET NULL로 자동 처리
+    const referencing = await db.activities
+      .where("accommodationId")
+      .equals(id)
+      .toArray();
+    for (const act of referencing) {
+      await db.activities.put({ ...act, accommodationId: null });
+    }
+
+    await db.accommodations.delete(id);
+  });
+  await enqueue("trip_accommodations", "delete", id, null);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Profile (v2 신규)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 유저 프로필 조회 (Dexie).
+ */
+export async function getProfile(userId) {
+  return db.profile.get(userId);
+}
+
+/**
+ * 프로필 upsert.
+ * 서버엔 auth trigger로 row가 자동 생성되므로 update만 필요.
+ */
+export async function updateProfile(userId, patch) {
+  const timestamp = now();
+  const existing = (await db.profile.get(userId)) ?? { id: userId };
+  const updated = normalizeForSync({
+    ...existing,
+    ...patch,
+    id: userId,
+    updatedAt: timestamp,
+  });
+
+  await db.profile.put(updated);
+  await enqueue("profiles", "update", userId, updated);
+  return updated;
 }

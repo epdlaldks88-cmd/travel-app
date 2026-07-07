@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   IconCheck,
   IconDownload,
@@ -8,13 +8,26 @@ import {
   IconUser,
   IconLogout,
   IconLoader2,
+  IconHome,
+  IconLocationSearch,
+  IconEdit,
 } from "@tabler/icons-react";
-import { Button, Card, Section, Switch } from "../components/ui";
+import {
+  Button,
+  Card,
+  Chip,
+  Input,
+  Label,
+  Section,
+  Switch,
+} from "../components/ui";
 import { useTheme } from "../theme/useTheme";
 import { useAuth } from "../lib/useAuth";
 import { supabase } from "../lib/supabase";
 import { db, clearLocalData } from "../data/db";
 import * as repository from "../data/repository";
+import { useProfile, useUpdateProfile } from "../data/hooks";
+import PlaceSearchModal from "../components/PlaceSearchModal";
 
 function ProfilePage() {
   return (
@@ -29,6 +42,9 @@ function ProfilePage() {
 
       {/* ─── 계정 섹션 ─────────────────────────────────── */}
       <AccountSection />
+
+      {/* ─── 우리집 섹션 (신규) ────────────────────────── */}
+      <HomeSection />
 
       {/* ─── 테마 섹션 ─────────────────────────────────── */}
       <ThemeSection />
@@ -96,6 +112,189 @@ function AccountSection() {
           로그아웃
         </Button>
       </Card>
+    </Section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   우리집 섹션 (v2 신규)
+   ═══════════════════════════════════════════════════════════ */
+
+function HomeSection() {
+  const profile = useProfile();
+  const updateProfile = useUpdateProfile();
+
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [gpsLat, setGpsLat] = useState(null);
+  const [gpsLng, setGpsLng] = useState(null);
+  const [showPlaceSearch, setShowPlaceSearch] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // 편집 진입 시 현재 값으로 초기화
+  useEffect(() => {
+    if (editing && profile) {
+      setName(profile.homeName ?? "우리집");
+      setAddress(profile.homeAddress ?? "");
+      setGpsLat(profile.homeGpsLat ?? null);
+      setGpsLng(profile.homeGpsLng ?? null);
+    }
+  }, [editing, profile?.id]);
+
+  const hasHome = !!profile?.homeAddress;
+
+  const handleStartEdit = () => {
+    setName(profile?.homeName ?? "우리집");
+    setAddress(profile?.homeAddress ?? "");
+    setGpsLat(profile?.homeGpsLat ?? null);
+    setGpsLng(profile?.homeGpsLng ?? null);
+    setEditing(true);
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert("이름을 입력하세요");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateProfile({
+        homeName: name.trim(),
+        homeAddress: address.trim() || null,
+        homeGpsLat: gpsLat,
+        homeGpsLng: gpsLng,
+      });
+      setEditing(false);
+    } catch (err) {
+      console.error("우리집 저장 실패:", err);
+      alert("저장 중 오류가 발생했습니다");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePlaceSelect = (place) => {
+    setAddress(place.address);
+    setGpsLat(place.lat);
+    setGpsLng(place.lng);
+    // 이름이 비어있으면 place 이름으로 대체
+    if (!name.trim()) {
+      setName(place.name || "우리집");
+    }
+  };
+
+  return (
+    <Section title="우리집" className="mb-6">
+      <Card padding="md">
+        {!editing ? (
+          <>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-surface-alt flex items-center justify-center text-text-muted shrink-0">
+                <IconHome size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                {hasHome ? (
+                  <>
+                    <p className="text-sm font-medium text-text truncate">
+                      {profile?.homeName || "우리집"}
+                    </p>
+                    <p className="text-xs text-text-muted truncate mt-0.5">
+                      {profile?.homeAddress}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-text">등록 안 됨</p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      출발지 자동 채움에 사용됩니다
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleStartEdit}
+              fullWidth
+              size="sm"
+              leftIcon={<IconEdit size={16} />}
+              className="mt-3"
+            >
+              {hasHome ? "수정" : "등록"}
+            </Button>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <Label>이름</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="우리집"
+              />
+            </div>
+
+            <div>
+              <Label>주소</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="주소 검색 또는 직접 입력"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPlaceSearch(true)}
+                  aria-label="주소 검색"
+                  title="카카오 지도에서 검색"
+                  className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted hover:text-text hover:bg-surface border border-border transition-colors"
+                >
+                  <IconLocationSearch size={18} />
+                </button>
+              </div>
+              {gpsLat != null && gpsLng != null && (
+                <p className="text-[10px] text-text-subtle mt-1 tracking-wide">
+                  좌표: {gpsLat.toFixed(5)}, {gpsLng.toFixed(5)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="secondary"
+                onClick={handleCancel}
+                fullWidth
+                disabled={saving}
+              >
+                취소
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                fullWidth
+                loading={saving}
+              >
+                저장
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {showPlaceSearch && (
+        <PlaceSearchModal
+          initialKeyword={address || name}
+          onSelect={handlePlaceSelect}
+          onClose={() => setShowPlaceSearch(false)}
+        />
+      )}
     </Section>
   );
 }
@@ -301,6 +500,11 @@ function DataSection() {
         tripIds.length > 0
           ? await db.day_notes.where("tripId").anyOf(tripIds).toArray()
           : [];
+      const accommodations =
+        tripIds.length > 0
+          ? await db.accommodations.where("tripId").anyOf(tripIds).toArray()
+          : [];
+      const profile = await db.profile.get(user.id);
 
       const data = {
         version: 2,
@@ -308,6 +512,8 @@ function DataSection() {
         trips,
         activities,
         dayNotes,
+        accommodations,
+        profile,
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -403,7 +609,7 @@ function DataSection() {
     setBusy(true);
     try {
       // 서버 데이터 삭제 (RLS 로 본인 소유만 삭제됨)
-      // trips 삭제 시 CASCADE 로 activities, day_notes 자동 삭제
+      // trips 삭제 시 CASCADE 로 activities, day_notes, trip_accommodations 자동 삭제
       const { data: trips, error: fetchErr } = await supabase
         .from("trips")
         .select("id");

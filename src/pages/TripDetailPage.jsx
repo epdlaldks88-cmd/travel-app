@@ -62,6 +62,13 @@ function TripDetailPage() {
     }
   }, [trip?.id]);
 
+  // ⭐ 새 액티비티 폼 열릴 때 상단 스크롤 (FAB/헤더 추가 버튼 공통)
+  useEffect(() => {
+    if (showActivityForm) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [showActivityForm]);
+
   const sortedActivities = useMemo(() => {
     if (sortOrder === "asc") return activities;
     return [...activities].reverse();

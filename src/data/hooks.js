@@ -90,6 +90,33 @@ export function useDayNotes(tripId) {
   return notes;
 }
 
+/** 여행의 숙소 목록 (v2 신규) */
+export function useAccommodations(tripId) {
+  const list = useLiveQuery(
+    async () => {
+      if (!tripId) return [];
+      return await db.accommodations.where("tripId").equals(tripId).toArray();
+    },
+    [tripId],
+    [],
+  );
+  return list;
+}
+
+/** 단일 숙소 (v2 신규) */
+export function useAccommodation(id) {
+  return useLiveQuery(() => (id ? db.accommodations.get(id) : undefined), [id]);
+}
+
+/** 현재 유저 프로필 (v2 신규) */
+export function useProfile() {
+  const { user } = useAuth();
+  return useLiveQuery(
+    () => (user?.id ? db.profile.get(user.id) : undefined),
+    [user?.id],
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════
    Mutation Hooks
    ═══════════════════════════════════════════════════════════ */
@@ -161,14 +188,59 @@ export function useUpsertDayNote() {
   }, []);
 }
 
+/* ─── Accommodation mutations (v2 신규) ─── */
+
+export function useCreateAccommodation() {
+  const { user } = useAuth();
+  return useCallback(
+    async (tripId, data) => {
+      if (!user) throw new Error("로그인이 필요합니다");
+      const entity = await repository.createAccommodation(
+        tripId,
+        user.id,
+        data,
+      );
+      triggerFlush();
+      return entity;
+    },
+    [user],
+  );
+}
+
+export function useUpdateAccommodation() {
+  return useCallback(async (id, patch) => {
+    const entity = await repository.updateAccommodation(id, patch);
+    triggerFlush();
+    return entity;
+  }, []);
+}
+
+export function useDeleteAccommodation() {
+  return useCallback(async (id) => {
+    await repository.deleteAccommodation(id);
+    triggerFlush();
+  }, []);
+}
+
+/* ─── Profile mutation (v2 신규) ─── */
+
+export function useUpdateProfile() {
+  const { user } = useAuth();
+  return useCallback(
+    async (patch) => {
+      if (!user) throw new Error("로그인이 필요합니다");
+      const entity = await repository.updateProfile(user.id, patch);
+      triggerFlush();
+      return entity;
+    },
+    [user],
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════
    Sync Status
    ═══════════════════════════════════════════════════════════ */
 
-/**
- * 대기 중인 sync 항목 수 + 온라인 여부.
- * SyncStatusBar 등에서 사용.
- */
 /**
  * 대기 중인 sync 항목 수 + 온라인 여부 + flush 진행 상태.
  * SyncStatusBar 등에서 사용.
