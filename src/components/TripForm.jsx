@@ -5,7 +5,7 @@ import { Button, Card, Chip, Input, Select, Label } from "./ui";
 
 const CATEGORY_OPTIONS = ["바다", "산", "도시", "맛집", "문화"];
 
-function TripForm({ onAdd }) {
+function TripForm({ onAdd, onCancel }) {
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -17,13 +17,12 @@ function TripForm({ onAdd }) {
   const [regionMinor, setRegionMinor] = useState("");
   const [categories, setCategories] = useState([]);
 
-  // 선택된 광역의 세부 지역 리스트
   const selectedMajor = DOMESTIC_REGIONS.find((r) => r.major === regionMajor);
   const availableMinors = selectedMajor ? selectedMajor.minors : [];
 
   const handleMajorChange = (value) => {
     setRegionMajor(value);
-    setRegionMinor(""); // 세부지역 리셋
+    setRegionMinor("");
   };
 
   const handleCountryTypeChange = (type) => {
@@ -69,8 +68,6 @@ function TripForm({ onAdd }) {
     setCategories([]);
   };
 
-  /* ─── Select options ──────────────────────────────────────
-     원본 UX 유지: 첫 옵션이 리셋 가능하도록 빈 옵션을 명시. */
   const majorOptions = [
     { value: "", label: "광역 선택" },
     ...DOMESTIC_REGIONS.map((r) => ({ value: r.major, label: r.major })),
@@ -89,7 +86,6 @@ function TripForm({ onAdd }) {
       <h2 className="text-base font-medium text-text mb-4">새 여행 추가</h2>
 
       <div className="space-y-3">
-        {/* 여행 제목 */}
         <div>
           <Label>여행 제목</Label>
           <Input
@@ -99,7 +95,6 @@ function TripForm({ onAdd }) {
           />
         </div>
 
-        {/* 지역 (국내/해외 토글 + 드롭다운) */}
         <div>
           <Label>지역</Label>
           <div className="flex gap-2 mb-2">
@@ -117,7 +112,6 @@ function TripForm({ onAdd }) {
             </Chip>
           </div>
 
-          {/* 국내: 광역 → 세부 순차 드롭다운 */}
           {countryType === "domestic" && (
             <div className="space-y-2">
               <Select
@@ -135,7 +129,6 @@ function TripForm({ onAdd }) {
             </div>
           )}
 
-          {/* 해외: 국가 드롭다운 */}
           {countryType === "international" && (
             <Select
               value={countryName}
@@ -145,7 +138,6 @@ function TripForm({ onAdd }) {
           )}
         </div>
 
-        {/* 시작일 · 종료일 */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>시작일</Label>
@@ -165,7 +157,6 @@ function TripForm({ onAdd }) {
           </div>
         </div>
 
-        {/* 동행자 */}
         <div>
           <Label>동행자</Label>
           <Input
@@ -175,7 +166,6 @@ function TripForm({ onAdd }) {
           />
         </div>
 
-        {/* 카테고리 (다중 선택) */}
         <div>
           <Label>카테고리 (여러 개 선택 가능)</Label>
           <div className="flex flex-wrap gap-2">
@@ -191,15 +181,22 @@ function TripForm({ onAdd }) {
           </div>
         </div>
 
-        {/* 추가 버튼 */}
-        <Button
-          variant="primary"
-          onClick={handleSubmit}
-          fullWidth
-          leftIcon={<IconPlus size={18} />}
-        >
-          여행 추가
-        </Button>
+        {/* 취소 · 추가 버튼 */}
+        <div className="flex gap-2 pt-1">
+          {onCancel && (
+            <Button variant="secondary" onClick={onCancel} fullWidth>
+              취소
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            onClick={handleSubmit}
+            fullWidth
+            leftIcon={<IconPlus size={18} />}
+          >
+            여행 추가
+          </Button>
+        </div>
       </div>
     </Card>
   );

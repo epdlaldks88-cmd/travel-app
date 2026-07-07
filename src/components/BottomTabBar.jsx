@@ -17,8 +17,15 @@ function BottomTabBar() {
   };
 
   const handleFabClick = () => {
-    navigate("/");
-    // 나중에 폼 자동 포커스 추가 가능
+    const path = location.pathname;
+
+    if (path.startsWith("/trips/")) {
+      // 여행 상세 → 현재 페이지에 activity 폼 열기
+      navigate(`${path}?new=1`);
+    } else {
+      // 그 외 페이지 → 홈으로 이동하며 새 여행 폼 열기
+      navigate("/?new=1");
+    }
   };
 
   return (
@@ -32,11 +39,10 @@ function BottomTabBar() {
           active={isActive("/favorites")}
         />
 
-        {/* FAB (중앙) */}
         <button
           type="button"
           onClick={handleFabClick}
-          aria-label="새 여행 추가"
+          aria-label="새로 추가"
           className="w-12 h-12 -mt-4 rounded-full flex items-center justify-center bg-accent text-accent-fg shadow-lg hover:opacity-90 active:opacity-80 transition-opacity"
         >
           <IconPlus size={22} />
@@ -59,10 +65,6 @@ function BottomTabBar() {
   );
 }
 
-/**
- * 개별 탭 링크. 4개 탭이 동일 구조라 서브컴포넌트로 추출.
- * 아이콘은 currentColor 상속 (Tabler 기본 동작).
- */
 function TabLink({ to, icon: Icon, label, active }) {
   return (
     <Link

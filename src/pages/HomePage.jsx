@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import TripForm from "../components/TripForm";
 import TripList from "../components/TripList";
 import { useTrips, useCreateTrip, useDeleteTrip } from "../data/hooks";
@@ -7,8 +8,16 @@ function HomePage() {
   const createTrip = useCreateTrip();
   const deleteTrip = useDeleteTrip();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showForm = searchParams.get("new") === "1";
+
   const handleAddTrip = async (data) => {
     await createTrip(data);
+    setSearchParams({});
+  };
+
+  const handleCancel = () => {
+    setSearchParams({});
   };
 
   const handleDeleteTrip = async (id) => {
@@ -26,7 +35,9 @@ function HomePage() {
           {trips.length > 0 ? `${trips.length} MEMORIES` : "나만의 여행 기록"}
         </p>
       </header>
-      <TripForm onAdd={handleAddTrip} />
+
+      {showForm && <TripForm onAdd={handleAddTrip} onCancel={handleCancel} />}
+
       <TripList trips={trips} onDelete={handleDeleteTrip} />
     </div>
   );

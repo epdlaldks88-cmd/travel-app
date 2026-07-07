@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useEffect, useState, useMemo } from "react";
+import {
+  useParams,
+  useNavigate,
+  Link,
+  useSearchParams,
+} from "react-router-dom";
 import {
   IconArrowLeft,
   IconCameraPlus,
   IconPlus,
   IconLoader2,
+  IconSortAscending,
+  IconSortDescending,
 } from "@tabler/icons-react";
 import ActivityForm from "../components/ActivityForm";
 import ActivityItem from "../components/ActivityItem";
@@ -35,14 +42,19 @@ function TripDetailPage() {
 
   const [memo, setMemo] = useState("");
   const [rating, setRating] = useState(0);
-  const [showActivityForm, setShowActivityForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // 편집 · 자식 추가 상태
   const [editingId, setEditingId] = useState(null);
   const [subFormParentId, setSubFormParentId] = useState(null);
 
-  // trip 로드/변경 시 memo, rating 로컬 상태 동기화
+  // 정렬 상태
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  // ⭐ URL 쿼리로 폼 표시 제어 (FAB, 헤더 "추가" 버튼 공통)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showActivityForm = searchParams.get("new") === "1";
+
   useEffect(() => {
     if (trip) {
       setMemo(trip.memo || "");
@@ -50,14 +62,15 @@ function TripDetailPage() {
     }
   }, [trip?.id]);
 
-  // ─── 핸들러 ──────────────────────────────────────────────
+  const sortedActivities = useMemo(() => {
+    if (sortOrder === "asc") return activities;
+    return [...activities].reverse();
+  }, [activities, sortOrder]);
 
-  /**
-   * 통합 제출 핸들러
-   * - editingActivity 있음 → 편집 (update)
-   * - subFormParentId 있음 → 자식 추가 (createSubActivity)
-   * - 둘 다 없음 → 새 부모 활동 추가 (createActivity)
-   */
+  const toggleSortOrder = () => {
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+  };
+
   const handleSubmitForm = async (payload, editingActivity) => {
     if (editingActivity) {
       await updateActivity(editingActivity.id, payload);
@@ -67,21 +80,19 @@ function TripDetailPage() {
       setSubFormParentId(null);
     } else {
       await createActivity(id, payload);
-      setShowActivityForm(false);
+      setSearchParams({});
     }
   };
 
   const handleStartEdit = (activity) => {
-    // 자식 추가 폼 열려있으면 닫기
     setSubFormParentId(null);
-    setShowActivityForm(false);
+    setSearchParams({});
     setEditingId(activity.id);
   };
 
   const handleStartAddSub = (parentId) => {
-    // 편집 열려있으면 닫기
     setEditingId(null);
-    setShowActivityForm(false);
+    setSearchParams({});
     setSubFormParentId(parentId);
   };
 
@@ -91,16 +102,18 @@ function TripDetailPage() {
   };
 
   const handleStartAddActivity = () => {
-    // 다른 폼 닫기
     setEditingId(null);
     setSubFormParentId(null);
-    setShowActivityForm(true);
+    setSearchParams({ new: "1" });
+  };
+
+  const handleCancelAddActivity = () => {
+    setSearchParams({});
   };
 
   const handleDeleteActivity = async (activityId) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return;
     await deleteActivity(activityId);
-    // 편집 중이던 것이 삭제됐다면 편집 상태도 해제
     if (editingId === activityId) setEditingId(null);
     if (subFormParentId === activityId) setSubFormParentId(null);
   };
@@ -115,7 +128,6 @@ function TripDetailPage() {
     }
   };
 
-  // ─── 로딩 · 미존재 ───────────────────────────────────────
   if (trip === undefined) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -138,7 +150,6 @@ function TripDetailPage() {
     );
   }
 
-  // 총 비용: 부모 + 모든 자식 합계
   const totalCost = calcTripTotal(activities);
 
   const formatFull = (dateStr) => {
@@ -148,7 +159,6 @@ function TripDetailPage() {
 
   return (
     <div className="-mt-4 -mx-4">
-      {/* ─── 히어로 커버 ─────────────────────────────────── */}
       <div className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-hero-from to-hero-to">
         <div className="flex justify-between">
           <button
@@ -185,7 +195,6 @@ function TripDetailPage() {
         </div>
       </div>
 
-      {/* ─── 통계 로우 ──────────────────────────────────── */}
       <div className="flex justify-between px-4 py-3 bg-bg border-b border-border">
         <StatCell label="일정" value={activities.length} />
         <StatCell
@@ -199,23 +208,45 @@ function TripDetailPage() {
         />
       </div>
 
-      {/* ─── 본문 ────────────────────────────────────────── */}
       <div className="p-4">
         <section className="mb-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-heading text-sm font-medium text-text">
               일정 ({activities.length})
             </h2>
-            {!showActivityForm && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleStartAddActivity}
-                leftIcon={<IconPlus size={14} />}
-              >
-                추가
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {activities.length > 1 && (
+                <button
+                  type="button"
+                  onClick={toggleSortOrder}
+                  aria-label={
+                    sortOrder === "asc" ? "내림차순 정렬" : "오름차순 정렬"
+                  }
+                  title={
+                    sortOrder === "asc"
+                      ? "시간순 (오래된 것 위)"
+                      : "역순 (최신 위)"
+                  }
+                  className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-surface-alt transition-colors"
+                >
+                  {sortOrder === "asc" ? (
+                    <IconSortAscending size={16} />
+                  ) : (
+                    <IconSortDescending size={16} />
+                  )}
+                </button>
+              )}
+              {!showActivityForm && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleStartAddActivity}
+                  leftIcon={<IconPlus size={14} />}
+                >
+                  추가
+                </Button>
+              )}
+            </div>
           </div>
 
           {showActivityForm && (
@@ -228,7 +259,7 @@ function TripDetailPage() {
                   : null
               }
               onSubmit={(payload) => handleSubmitForm(payload, null)}
-              onCancel={() => setShowActivityForm(false)}
+              onCancel={handleCancelAddActivity}
             />
           )}
 
@@ -238,7 +269,7 @@ function TripDetailPage() {
             </Card>
           )}
 
-          {activities.map((activity) => (
+          {sortedActivities.map((activity) => (
             <ActivityItem
               key={activity.id}
               activity={activity}
@@ -256,7 +287,6 @@ function TripDetailPage() {
           ))}
         </section>
 
-        {/* 전체 평점 */}
         <Card padding="md" className="mb-4">
           <h2 className="font-heading text-sm font-medium text-text mb-3">
             전체 평점
@@ -264,7 +294,6 @@ function TripDetailPage() {
           <Rating value={rating} onChange={setRating} size="lg" />
         </Card>
 
-        {/* 한줄 회고 */}
         <Card padding="md" className="mb-4">
           <h2 className="font-heading text-sm font-medium text-text mb-3">
             한줄 회고
