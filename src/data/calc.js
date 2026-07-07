@@ -12,7 +12,7 @@ export function calcActivityTotal(parent, children) {
 }
 
 /**
- * 부모 카드에 "💰 총 비용" 배지를 보여줄지 판단
+ * 부모 카드에 "총 비용" 배지를 보여줄지 판단
  * (자식 중 비용 > 0 이 하나라도 있을 때 true)
  */
 export function hasChildrenCost(parent) {
@@ -22,7 +22,6 @@ export function hasChildrenCost(parent) {
 
 /**
  * Trip 전체 비용 (모든 부모 활동의 총합)
- * useActivities() 결과를 넘기면 됨
  */
 export function calcTripTotal(activities) {
   if (!activities?.length) return 0;

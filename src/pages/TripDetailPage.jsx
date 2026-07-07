@@ -14,8 +14,11 @@ import {
   useActivities,
   useUpdateTrip,
   useCreateActivity,
+  useUpdateActivity,
   useDeleteActivity,
+  useCreateSubActivity,
 } from "../data/hooks";
+import { calcTripTotal } from "../data/calc";
 
 function TripDetailPage() {
   const { id } = useParams();
@@ -26,12 +29,18 @@ function TripDetailPage() {
 
   const updateTrip = useUpdateTrip();
   const createActivity = useCreateActivity();
+  const updateActivity = useUpdateActivity();
   const deleteActivity = useDeleteActivity();
+  const createSubActivity = useCreateSubActivity();
 
   const [memo, setMemo] = useState("");
   const [rating, setRating] = useState(0);
   const [showActivityForm, setShowActivityForm] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // 편집 · 자식 추가 상태
+  const [editingId, setEditingId] = useState(null);
+  const [subFormParentId, setSubFormParentId] = useState(null);
 
   // trip 로드/변경 시 memo, rating 로컬 상태 동기화
   useEffect(() => {
@@ -42,14 +51,58 @@ function TripDetailPage() {
   }, [trip?.id]);
 
   // ─── 핸들러 ──────────────────────────────────────────────
-  const handleAddActivity = async (data) => {
-    await createActivity(id, data);
+
+  /**
+   * 통합 제출 핸들러
+   * - editingActivity 있음 → 편집 (update)
+   * - subFormParentId 있음 → 자식 추가 (createSubActivity)
+   * - 둘 다 없음 → 새 부모 활동 추가 (createActivity)
+   */
+  const handleSubmitForm = async (payload, editingActivity) => {
+    if (editingActivity) {
+      await updateActivity(editingActivity.id, payload);
+      setEditingId(null);
+    } else if (subFormParentId) {
+      await createSubActivity(subFormParentId, payload);
+      setSubFormParentId(null);
+    } else {
+      await createActivity(id, payload);
+      setShowActivityForm(false);
+    }
+  };
+
+  const handleStartEdit = (activity) => {
+    // 자식 추가 폼 열려있으면 닫기
+    setSubFormParentId(null);
     setShowActivityForm(false);
+    setEditingId(activity.id);
+  };
+
+  const handleStartAddSub = (parentId) => {
+    // 편집 열려있으면 닫기
+    setEditingId(null);
+    setShowActivityForm(false);
+    setSubFormParentId(parentId);
+  };
+
+  const handleCancelForm = () => {
+    setEditingId(null);
+    setSubFormParentId(null);
+  };
+
+  const handleStartAddActivity = () => {
+    // 다른 폼 닫기
+    setEditingId(null);
+    setSubFormParentId(null);
+    setShowActivityForm(true);
   };
 
   const handleDeleteActivity = async (activityId) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return;
     await deleteActivity(activityId);
+    // 편집 중이던 것이 삭제됐다면 편집 상태도 해제
+    if (editingId === activityId) setEditingId(null);
+    if (subFormParentId === activityId) setSubFormParentId(null);
   };
 
   const handleSave = async () => {
@@ -63,7 +116,6 @@ function TripDetailPage() {
   };
 
   // ─── 로딩 · 미존재 ───────────────────────────────────────
-  // useLiveQuery 초기값 undefined = 로딩 중
   if (trip === undefined) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -86,7 +138,8 @@ function TripDetailPage() {
     );
   }
 
-  const totalCost = activities.reduce((sum, a) => sum + (a.cost || 0), 0);
+  // 총 비용: 부모 + 모든 자식 합계
+  const totalCost = calcTripTotal(activities);
 
   const formatFull = (dateStr) => {
     if (!dateStr) return "";
@@ -94,9 +147,8 @@ function TripDetailPage() {
   };
 
   return (
-    // 페이지 상위에 적용된 p-4 를 무효화하여 히어로가 전폭 커버
     <div className="-mt-4 -mx-4">
-      {/* ─── 히어로 커버 (테마별 그라데이션) ─────────────── */}
+      {/* ─── 히어로 커버 ─────────────────────────────────── */}
       <div className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-hero-from to-hero-to">
         <div className="flex justify-between">
           <button
@@ -149,7 +201,6 @@ function TripDetailPage() {
 
       {/* ─── 본문 ────────────────────────────────────────── */}
       <div className="p-4">
-        {/* 일정 섹션 */}
         <section className="mb-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-heading text-sm font-medium text-text">
@@ -159,7 +210,7 @@ function TripDetailPage() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setShowActivityForm(true)}
+                onClick={handleStartAddActivity}
                 leftIcon={<IconPlus size={14} />}
               >
                 추가
@@ -176,7 +227,7 @@ function TripDetailPage() {
                   ? activities[activities.length - 1].name
                   : null
               }
-              onAdd={handleAddActivity}
+              onSubmit={(payload) => handleSubmitForm(payload, null)}
               onCancel={() => setShowActivityForm(false)}
             />
           )}
@@ -191,7 +242,16 @@ function TripDetailPage() {
             <ActivityItem
               key={activity.id}
               activity={activity}
+              editingId={editingId}
+              subFormParentId={subFormParentId}
+              onStartEdit={handleStartEdit}
               onDelete={handleDeleteActivity}
+              onStartAddSub={handleStartAddSub}
+              onSubmitForm={handleSubmitForm}
+              onCancelForm={handleCancelForm}
+              tripStartDate={trip.startDate}
+              tripEndDate={trip.endDate}
+              previousActivityName={null}
             />
           ))}
         </section>
@@ -218,7 +278,6 @@ function TripDetailPage() {
           />
         </Card>
 
-        {/* 저장 버튼 */}
         <Button
           variant="primary"
           onClick={handleSave}

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "./db";
 import * as repository from "./repository";
-import { triggerFlush } from "./sync";
 import { useAuth } from "../lib/useAuth";
+import { triggerFlush, syncWorker } from "./sync";
 
 /* ═══════════════════════════════════════════════════════════
    Query Hooks (Dexie useLiveQuery 기반, 자동 재렌더)
@@ -130,6 +130,14 @@ export function useCreateActivity() {
   }, []);
 }
 
+export function useCreateSubActivity() {
+  return useCallback(async (parentId, data) => {
+    const entity = await repository.createSubActivity(parentId, data);
+    triggerFlush();
+    return entity;
+  }, []);
+}
+
 export function useUpdateActivity() {
   return useCallback(async (id, patch) => {
     const entity = await repository.updateActivity(id, patch);
@@ -161,22 +169,34 @@ export function useUpsertDayNote() {
  * 대기 중인 sync 항목 수 + 온라인 여부.
  * SyncStatusBar 등에서 사용.
  */
+/**
+ * 대기 중인 sync 항목 수 + 온라인 여부 + flush 진행 상태.
+ * SyncStatusBar 등에서 사용.
+ */
 export function useSyncStatus() {
   const pending = useLiveQuery(() => db.sync_queue.count(), [], 0);
   const [online, setOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
+  const [isFlushing, setIsFlushing] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+
+    // syncWorker의 flush 상태 구독
+    const unsubscribe = syncWorker.subscribe(({ isFlushing }) => {
+      setIsFlushing(isFlushing);
+    });
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      unsubscribe();
     };
   }, []);
 
-  return { pending, online };
+  return { pending, online, isFlushing };
 }

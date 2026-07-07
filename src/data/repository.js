@@ -1,20 +1,7 @@
 import { db } from "./db";
 
-/**
- * Repository — 데이터 접근 계층.
- *
- * 모든 write 는:
- *   1. UUID 생성 (create 시)
- *   2. Dexie 즉시 업데이트 (낙관적 UI)
- *   3. sync_queue 에 등록 (서버 전송 대기)
- *
- * SyncWorker 가 큐를 감시해서 온라인일 때 flush.
- * 사용자 코드는 서버 왕복 대기 안 함.
- */
-
 /* ─── Helpers ─────────────────────────────────────────────── */
 
-// 자식 카테고리 (부모 5개와 다름: 렌트카/숙소 제외, 카페/쇼핑 추가)
 export const SUB_ACTIVITY_TYPES = ["관광", "식당", "카페", "쇼핑", "기타"];
 
 function now() {
@@ -36,11 +23,61 @@ async function enqueue(table, operation, entityId, payload) {
   });
 }
 
+/**
+ * Postgres에서 빈 문자열을 허용하지 않는 컬럼들.
+ * 이런 필드는 "" → null 로 정규화.
+ *
+ * - time / date 계열: Postgres time/date 타입은 "" 안 받음
+ * - 숫자 계열: Postgres numeric/integer 타입도 "" 안 받음
+ */
+const NULLABLE_TIME_FIELDS = [
+  "date",
+  "time",
+  "checkoutTime",
+  "returnTime",
+  "startDate",
+  "endDate",
+  "wakeTime",
+  "sleepTime",
+];
+
+const NULLABLE_NUMBER_FIELDS = [
+  "rating",
+  "distanceKm",
+  "nights",
+  "days",
+  "mood",
+  "gpsLat",
+  "gpsLng",
+];
+
+/**
+ * 서버 전송용 payload 정규화.
+ * - time/date 필드의 "" → null
+ * - 숫자 필드의 "" → null
+ * - undefined → 제외 (patch에서 명시 안 한 필드는 서버에 보내지 않음)
+ */
+function normalizeForSync(payload) {
+  const result = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) continue;
+
+    if (NULLABLE_TIME_FIELDS.includes(key) && value === "") {
+      result[key] = null;
+    } else if (NULLABLE_NUMBER_FIELDS.includes(key) && value === "") {
+      result[key] = null;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 /* ─── Trips ───────────────────────────────────────────────── */
 
 export async function createTrip(data, ownerId) {
   const timestamp = now();
-  const entity = {
+  const entity = normalizeForSync({
     id: newId(),
     ownerId,
     title: data.title,
@@ -56,7 +93,7 @@ export async function createTrip(data, ownerId) {
     rating: null,
     createdAt: timestamp,
     updatedAt: timestamp,
-  };
+  });
 
   await db.trips.add(entity);
   await enqueue("trips", "insert", entity.id, entity);
@@ -65,11 +102,12 @@ export async function createTrip(data, ownerId) {
 
 export async function updateTrip(id, patch) {
   const timestamp = now();
-  const merged = { ...patch, updatedAt: timestamp };
-  await db.trips.update(id, merged);
+  const normalized = normalizeForSync({ ...patch, updatedAt: timestamp });
+  await db.trips.update(id, normalized);
   const entity = await db.trips.get(id);
   if (entity) {
-    await enqueue("trips", "update", id, entity);
+    // 로컬에서 다시 읽은 entity도 정규화 (혹시 이전에 저장된 잘못된 값 방어)
+    await enqueue("trips", "update", id, normalizeForSync(entity));
   }
   return entity;
 }
@@ -83,7 +121,6 @@ export async function deleteTrip(id) {
     db.sync_queue,
     async () => {
       await db.trips.delete(id);
-      // 로컬 캐시에서 자식들도 정리 (서버는 CASCADE 로 자동)
       await db.activities.where("tripId").equals(id).delete();
       await db.day_notes.where("tripId").equals(id).delete();
     },
@@ -95,7 +132,7 @@ export async function deleteTrip(id) {
 
 export async function createActivity(tripId, data) {
   const timestamp = now();
-  const entity = {
+  const entity = normalizeForSync({
     id: newId(),
     tripId,
     type: data.type,
@@ -104,36 +141,36 @@ export async function createActivity(tripId, data) {
     cost: data.cost || 0,
     memo: data.memo || "",
     rating: data.rating ?? null,
-    // 장소 (공통)
+    // 장소
     name: data.name || "",
     location: data.location || "",
-    // 이동 정보 (공통, 이 장소에 오기까지)
+    // 이동 정보
     origin: data.origin || "",
     transport: data.transport || "",
     durationHours: data.durationHours || 0,
     durationMinutes: data.durationMinutes || 0,
     distanceKm: data.distanceKm ?? null,
-    // 식사 전용
+    // 식사
     mealType: data.mealType || "",
     cuisines: data.cuisines || [],
     foodTypes: data.foodTypes || [],
     foodDetails: data.foodDetails || "",
-    // 숙소 전용
+    // 숙소
     nights: data.nights ?? null,
     checkoutTime: data.checkoutTime || null,
-    // 렌트카 전용
+    // 렌트카
     days: data.days ?? null,
     returnTime: data.returnTime || null,
     carModel: data.carModel || "",
-    // Step 2 확장
+    // Step 2
     isFavorite: data.isFavorite ?? false,
     revisit: data.revisit || null,
-    // Step 3 확장 (GPS)
+    // Step 3 (GPS)
     gpsLat: data.gpsLat ?? null,
     gpsLng: data.gpsLng ?? null,
     createdAt: timestamp,
     updatedAt: timestamp,
-  };
+  });
 
   await db.activities.add(entity);
   await enqueue("activities", "insert", entity.id, entity);
@@ -151,21 +188,20 @@ export async function createSubActivity(parentId, data) {
   }
 
   const timestamp = now();
-  const entity = {
+  const entity = normalizeForSync({
     id: newId(),
     tripId: parent.tripId,
     parentActivityId: parentId,
-    date: parent.date || null, // 부모 날짜 상속
+    date: parent.date || null,
     type: data.type,
     time: data.time || null,
     cost: data.cost || 0,
     memo: data.memo || "",
     rating: data.rating ?? null,
-    // 장소 (이름만)
     name: data.name || "",
     createdAt: timestamp,
     updatedAt: timestamp,
-  };
+  });
 
   await db.activities.add(entity);
   await enqueue("activities", "insert", entity.id, entity);
@@ -174,11 +210,11 @@ export async function createSubActivity(parentId, data) {
 
 export async function updateActivity(id, patch) {
   const timestamp = now();
-  const merged = { ...patch, updatedAt: timestamp };
-  await db.activities.update(id, merged);
+  const normalized = normalizeForSync({ ...patch, updatedAt: timestamp });
+  await db.activities.update(id, normalized);
   const entity = await db.activities.get(id);
   if (entity) {
-    await enqueue("activities", "update", id, entity);
+    await enqueue("activities", "update", id, normalizeForSync(entity));
   }
   return entity;
 }
@@ -190,9 +226,6 @@ export async function deleteActivity(id) {
 
 /* ─── Day Notes ───────────────────────────────────────────── */
 
-/**
- * date 기준으로 upsert. 같은 (tripId, date) 있으면 update, 없으면 insert.
- */
 export async function upsertDayNote(tripId, date, patch) {
   const existing = await db.day_notes
     .where(["tripId", "date"])
@@ -202,13 +235,13 @@ export async function upsertDayNote(tripId, date, patch) {
   const timestamp = now();
 
   if (existing) {
-    const merged = { ...patch, updatedAt: timestamp };
-    await db.day_notes.update(existing.id, merged);
+    const normalized = normalizeForSync({ ...patch, updatedAt: timestamp });
+    await db.day_notes.update(existing.id, normalized);
     const entity = await db.day_notes.get(existing.id);
-    await enqueue("day_notes", "update", existing.id, entity);
+    await enqueue("day_notes", "update", existing.id, normalizeForSync(entity));
     return entity;
   } else {
-    const entity = {
+    const entity = normalizeForSync({
       id: newId(),
       tripId,
       date,
@@ -220,7 +253,7 @@ export async function upsertDayNote(tripId, date, patch) {
       journal: patch.journal || "",
       createdAt: timestamp,
       updatedAt: timestamp,
-    };
+    });
     await db.day_notes.add(entity);
     await enqueue("day_notes", "insert", entity.id, entity);
     return entity;

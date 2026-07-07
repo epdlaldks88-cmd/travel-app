@@ -1,5 +1,5 @@
-import { IconCloudOff, IconRefresh } from '@tabler/icons-react';
-import { useSyncStatus } from '../data/hooks';
+import { IconCloudOff, IconRefresh, IconClock } from "@tabler/icons-react";
+import { useSyncStatus } from "../data/hooks";
 
 /**
  * SyncStatusBar
@@ -9,10 +9,11 @@ import { useSyncStatus } from '../data/hooks';
  *
  * 표시 조건:
  *   - 오프라인 → "오프라인" + 대기 개수
- *   - 온라인이지만 큐 대기 중 → "동기화 중 · N개 대기"
+ *   - 온라인 & flushing → "동기화 중" (아이콘 회전) + 대기 개수
+ *   - 온라인 & 대기 있음 & 아이들 → "동기화 대기" (아이콘 정지)
  */
 export default function SyncStatusBar() {
-  const { pending, online } = useSyncStatus();
+  const { pending, online, isFlushing } = useSyncStatus();
 
   if (online && pending === 0) return null;
 
@@ -29,10 +30,18 @@ export default function SyncStatusBar() {
               </span>
             )}
           </>
-        ) : (
+        ) : isFlushing ? (
           <>
             <IconRefresh size={14} className="text-text-muted animate-spin" />
             <span className="text-text-muted">동기화 중</span>
+            <span className="text-text-subtle ml-auto">
+              {pending}개 대기 중
+            </span>
+          </>
+        ) : (
+          <>
+            <IconClock size={14} className="text-text-muted" />
+            <span className="text-text-muted">동기화 대기</span>
             <span className="text-text-subtle ml-auto">
               {pending}개 대기 중
             </span>
