@@ -35,6 +35,7 @@ import {
   useUpsertDayNote,
 } from "../data/hooks";
 import { calcTripTotal } from "../data/calc";
+import { useToast } from "../components/Toast";
 
 function TripDetailPage() {
   const { id } = useParams();
@@ -75,6 +76,8 @@ function TripDetailPage() {
   // ⭐ URL 쿼리로 폼 표시 제어 (FAB, 헤더 "추가" 버튼 공통)
   const [searchParams, setSearchParams] = useSearchParams();
   const showActivityForm = searchParams.get("new") === "1";
+
+  const toast = useToast();
 
   useEffect(() => {
     if (trip) {
@@ -124,15 +127,23 @@ function TripDetailPage() {
   /* ─── 액티비티 핸들러 ─────────────────────────── */
 
   const handleSubmitForm = async (payload, editingActivity) => {
-    if (editingActivity) {
-      await updateActivity(editingActivity.id, payload);
-      setEditingId(null);
-    } else if (subFormParentId) {
-      await createSubActivity(subFormParentId, payload);
-      setSubFormParentId(null);
-    } else {
-      await createActivity(id, payload);
-      setSearchParams({});
+    try {
+      if (editingActivity) {
+        await updateActivity(editingActivity.id, payload);
+        setEditingId(null);
+        toast.success("일정이 저장되었습니다");
+      } else if (subFormParentId) {
+        await createSubActivity(subFormParentId, payload);
+        setSubFormParentId(null);
+        toast.success("세부 일정이 추가되었습니다");
+      } else {
+        await createActivity(id, payload);
+        setSearchParams({});
+        toast.success("일정이 추가되었습니다");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("저장 실패: " + (err.message || "알 수 없는 오류"));
     }
   };
 
@@ -165,9 +176,14 @@ function TripDetailPage() {
 
   const handleDeleteActivity = async (activityId) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return;
-    await deleteActivity(activityId);
-    if (editingId === activityId) setEditingId(null);
-    if (subFormParentId === activityId) setSubFormParentId(null);
+    try {
+      await deleteActivity(activityId);
+      if (editingId === activityId) setEditingId(null);
+      if (subFormParentId === activityId) setSubFormParentId(null);
+      toast.success("일정이 삭제되었습니다");
+    } catch (err) {
+      toast.error("삭제 실패: " + err.message);
+    }
   };
 
   /* ─── 숙소 핸들러 ─────────────────────────── */
@@ -188,25 +204,41 @@ function TripDetailPage() {
   };
 
   const handleSubmitAccommodationForm = async (payload, editingAcc) => {
-    if (editingAcc) {
-      await updateAccommodation(editingAcc.id, payload);
-      setEditingAccId(null);
-    } else {
-      await createAccommodation(id, payload);
-      setShowAccForm(false);
+    try {
+      if (editingAcc) {
+        await updateAccommodation(editingAcc.id, payload);
+        setEditingAccId(null);
+        toast.success("숙소가 저장되었습니다");
+      } else {
+        await createAccommodation(id, payload);
+        setShowAccForm(false);
+        toast.success("숙소가 추가되었습니다");
+      }
+    } catch (err) {
+      toast.error("저장 실패: " + err.message);
     }
   };
 
   const handleDeleteAccommodation = async (accId) => {
     if (!confirm("이 숙소를 삭제하시겠습니까?")) return;
-    await deleteAccommodation(accId);
-    if (editingAccId === accId) setEditingAccId(null);
+    try {
+      await deleteAccommodation(accId);
+      if (editingAccId === accId) setEditingAccId(null);
+      toast.success("숙소가 삭제되었습니다");
+    } catch (err) {
+      toast.error("삭제 실패: " + err.message);
+    }
   };
 
   /* ─── DayNote 핸들러 ─────────────────────────── */
 
   const handleSaveDayNote = async (date, patch) => {
-    await upsertDayNote(id, date, patch);
+    try {
+      await upsertDayNote(id, date, patch);
+      toast.success("노트가 저장되었습니다");
+    } catch (err) {
+      toast.error("저장 실패: " + err.message);
+    }
   };
 
   /* ─── Trip 저장 ─────────────────────────── */
@@ -215,7 +247,9 @@ function TripDetailPage() {
     setSaving(true);
     try {
       await updateTrip(id, { memo, rating });
-      alert("저장되었습니다");
+      toast.success("저장되었습니다");
+    } catch (err) {
+      toast.error("저장 실패: " + err.message);
     } finally {
       setSaving(false);
     }

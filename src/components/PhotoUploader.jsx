@@ -3,65 +3,70 @@ import {
   IconPhotoPlus,
   IconTrash,
   IconLoader2,
-  IconAlertCircle,
+  IconStar,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import { Button } from "./ui";
 import {
   useActivityPhotos,
   useAddActivityPhoto,
   useDeleteActivityPhoto,
+  useUpdateActivityPhotoOrder,
   usePhotoUrls,
 } from "../data/hooks";
+import { useToast } from "./Toast";
 
 const MAX_PHOTOS = 50;
 
 /**
- * 액티비티 편집 시 사진 업로드/삭제 섹션.
- * 편집 모드에서만 노출 (신규 액티비티는 activityId 없어서 사용 불가).
+ * 액티비티 편집 시 사진 업로드/삭제/대표 지정 섹션.
  */
 function PhotoUploader({ activityId, onOpenGallery }) {
   const photos = useActivityPhotos(activityId);
   const addPhoto = useAddActivityPhoto();
   const deletePhoto = useDeleteActivityPhoto();
+  const updateOrder = useUpdateActivityPhotoOrder();
+  const toast = useToast();
 
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [errors, setErrors] = useState([]);
 
   const urlMap = usePhotoUrls(photos);
 
   const currentCount = photos?.length ?? 0;
   const remaining = MAX_PHOTOS - currentCount;
 
+  // 첫 번째 사진 = 대표 (sortOrder 오름차순 정렬 기준)
+  const coverId = photos?.[0]?.id;
+
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
-    e.target.value = ""; // 같은 파일 재선택 가능하게
+    e.target.value = "";
 
     if (files.length === 0) return;
 
-    // 갯수 제한
     if (files.length > remaining) {
-      alert(
-        `최대 ${MAX_PHOTOS}장까지 등록 가능합니다. (남은 자리: ${remaining}장)`,
+      toast.error(
+        `최대 ${MAX_PHOTOS}장까지 등록 가능합니다 (남은 자리: ${remaining}장)`,
       );
       return;
     }
 
     setUploading(true);
-    setErrors([]);
     setProgress({ done: 0, total: files.length });
 
+    let successCount = 0;
     const failedFiles = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        // 새 사진의 sortOrder = 기존 개수 + 인덱스
         await addPhoto(activityId, file, currentCount + i);
+        successCount++;
       } catch (err) {
         console.error(`[photo] 업로드 실패 (${file.name}):`, err);
-        failedFiles.push({ name: file.name, message: err.message });
+        failedFiles.push(file.name);
       }
       setProgress({ done: i + 1, total: files.length });
     }
@@ -69,10 +74,11 @@ function PhotoUploader({ activityId, onOpenGallery }) {
     setUploading(false);
     setProgress({ done: 0, total: 0 });
 
+    if (successCount > 0) {
+      toast.success(`사진 ${successCount}장 업로드 완료`);
+    }
     if (failedFiles.length > 0) {
-      setErrors(failedFiles);
-      const summary = failedFiles.map((f) => `• ${f.name}`).join("\n");
-      alert(`${failedFiles.length}장 업로드 실패:\n${summary}`);
+      toast.error(`${failedFiles.length}장 업로드 실패`);
     }
   };
 
@@ -80,9 +86,26 @@ function PhotoUploader({ activityId, onOpenGallery }) {
     if (!confirm("이 사진을 삭제하시겠습니까?")) return;
     try {
       await deletePhoto(photo.id);
+      toast.success("사진이 삭제되었습니다");
     } catch (err) {
       console.error("[photo] 삭제 실패:", err);
-      alert(`삭제 실패: ${err.message}`);
+      toast.error("삭제 실패");
+    }
+  };
+
+  /**
+   * 대표로 지정: 이 사진의 sortOrder를 (최소값 - 1)로 만들어 맨 앞으로.
+   * 다른 사진들은 그대로 유지 (상대 순서 보존).
+   */
+  const handleSetCover = async (photo) => {
+    if (photo.id === coverId) return; // 이미 대표
+    try {
+      const minSort = Math.min(...photos.map((p) => p.sortOrder ?? 0));
+      await updateOrder(photo.id, minSort - 1);
+      toast.success("대표 사진이 변경되었습니다");
+    } catch (err) {
+      console.error("[photo] 대표 지정 실패:", err);
+      toast.error("변경 실패");
     }
   };
 
@@ -129,63 +152,78 @@ function PhotoUploader({ activityId, onOpenGallery }) {
       )}
 
       {currentCount > 0 && (
-        <div className="grid grid-cols-3 gap-1.5">
-          {photos.map((photo, idx) => {
-            const url = urlMap[photo.storagePath];
-            return (
-              <div
-                key={photo.id}
-                className="relative aspect-square rounded-lg overflow-hidden bg-surface-alt group"
-              >
-                {url ? (
+        <>
+          <p className="text-[10px] text-text-subtle mb-1.5">
+            별표 아이콘을 눌러 대표 사진(카드 썸네일)을 변경할 수 있습니다
+          </p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {photos.map((photo, idx) => {
+              const url = urlMap[photo.storagePath];
+              const isCover = photo.id === coverId;
+              return (
+                <div
+                  key={photo.id}
+                  className="relative aspect-square rounded-lg overflow-hidden bg-surface-alt group"
+                >
+                  {url ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenGallery?.(idx)}
+                      className="w-full h-full block"
+                      aria-label="사진 크게 보기"
+                    >
+                      <img
+                        src={url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <IconLoader2
+                        size={16}
+                        className="animate-spin text-text-subtle"
+                      />
+                    </div>
+                  )}
+
+                  {/* 대표 지정 버튼 (좌상단) */}
                   <button
                     type="button"
-                    onClick={() => onOpenGallery?.(idx)}
-                    className="w-full h-full block"
-                    aria-label="사진 크게 보기"
+                    onClick={() => handleSetCover(photo)}
+                    aria-label={isCover ? "현재 대표 사진" : "대표로 지정"}
+                    title={isCover ? "현재 대표 사진" : "대표로 지정"}
+                    className={`
+                      absolute top-1 left-1 p-1 rounded-full transition-colors
+                      ${
+                        isCover
+                          ? "bg-accent text-white"
+                          : "bg-black/50 text-white/70 hover:text-white hover:bg-black/70 opacity-0 group-hover:opacity-100"
+                      }
+                    `}
                   >
-                    <img
-                      src={url}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+                    {isCover ? (
+                      <IconStarFilled size={12} />
+                    ) : (
+                      <IconStar size={12} />
+                    )}
                   </button>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <IconLoader2
-                      size={16}
-                      className="animate-spin text-text-subtle"
-                    />
-                  </div>
-                )}
 
-                <button
-                  type="button"
-                  onClick={() => handleDelete(photo)}
-                  aria-label="사진 삭제"
-                  className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <IconTrash size={12} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {errors.length > 0 && (
-        <div className="mt-2 p-2 rounded-lg bg-danger-bg text-xs text-danger flex items-start gap-2">
-          <IconAlertCircle size={14} className="shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium">{errors.length}장 업로드 실패</p>
-            <ul className="mt-1 text-danger/80">
-              {errors.map((e, i) => (
-                <li key={i}>{e.name}</li>
-              ))}
-            </ul>
+                  {/* 삭제 버튼 (우상단) */}
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(photo)}
+                    aria-label="사진 삭제"
+                    className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <IconTrash size={12} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
