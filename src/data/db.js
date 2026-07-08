@@ -1,24 +1,5 @@
 import Dexie from "dexie";
 
-/**
- * Dexie DB 스키마 (travel-app)
- *
- * Stores:
- *   trips              - 여행 (오프라인 캐시)
- *   activities         - 일정 (오프라인 캐시)
- *   day_notes          - 일별 감상 (오프라인 캐시)
- *   accommodations     - 여행별 숙소 정보 (v2)
- *   profile            - 유저 프로필 캐시 (v2)
- *   activity_photos    - 액티비티 사진 메타 (v3 신규, 파일은 Storage)
- *   sync_queue         - 서버로 전송 대기 중인 변경 (오프라인 큐)
- *   meta               - 앱 메타 (마지막 sync 시각 등)
- *
- * 인덱스 규칙:
- *   Dexie 는 boolean 값을 인덱스로 못 씀 (is_favorite 등은 in-memory 필터).
- *
- * 데이터 형식은 camelCase (Supabase snake_case ↔ mappers.js 로 변환).
- */
-
 class TravelDB extends Dexie {
   constructor() {
     super("travel-app");
@@ -41,8 +22,21 @@ class TravelDB extends Dexie {
       meta: "key",
     });
 
-    // ⭐ v3: 액티비티 사진 스토어 추가
     this.version(3).stores({
+      trips: "id, ownerId, startDate, updatedAt",
+      activities: "id, tripId, date, accommodationId, updatedAt",
+      day_notes: "id, tripId, [tripId+date], updatedAt",
+      accommodations: "id, tripId, ownerId, updatedAt",
+      profile: "id",
+      activity_photos: "id, activityId, ownerId, sortOrder, updatedAt",
+      sync_queue: "++id, table, entityId, createdAt",
+      meta: "key",
+    });
+
+    // ⭐ v4: origin GPS 필드 (스토어 구조는 그대로, 필드만 추가되므로 실제로는 마이그레이션만)
+    // Dexie는 인덱싱된 필드만 스키마에 정의. origin_gps는 인덱스 불필요라 v4는 사실상 no-op.
+    // 그래도 명시적으로 v4를 만들어두면 나중에 인덱스 추가 시 편함.
+    this.version(4).stores({
       trips: "id, ownerId, startDate, updatedAt",
       activities: "id, tripId, date, accommodationId, updatedAt",
       day_notes: "id, tripId, [tripId+date], updatedAt",
