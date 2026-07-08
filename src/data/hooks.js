@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "./db";
+import * as repository from "./repository";
 import {
   addActivityPhoto,
   deleteActivityPhoto,
