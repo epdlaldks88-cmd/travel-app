@@ -30,6 +30,14 @@ import {
   secondsToHM,
   metersToKm,
 } from "../lib/kakaoDirections";
+import PhotoUploader from "./PhotoUploader";
+import PhotoGallery from "./PhotoGallery";
+import {
+  useProfile,
+  useAccommodations,
+  useActivityPhotos,
+  usePhotoUrls,
+} from "../data/hooks";
 
 const ACTIVITY_TYPES = [
   { value: "관광지", icon: IconMapPin },
@@ -81,6 +89,10 @@ function ActivityForm({
   const hasHome = !!profile?.homeAddress || !!profile?.homeName;
   const accommodations = useAccommodations(tripId) || [];
   const toast = useToast();
+
+  const photos = useActivityPhotos(isEditing ? initialData?.id : null) || [];
+  const urlMap = usePhotoUrls(photos);
+  const [galleryOpenAt, setGalleryOpenAt] = useState(null);
 
   const [type, setType] = useState(initialData?.type ?? defaultType);
 
@@ -818,6 +830,16 @@ function ActivityForm({
             <Rating value={rating} onChange={setRating} size="lg" />
           </div>
 
+          {/* ============ 사진 (편집 모드 · 부모만) ============ */}
+          {isEditing && !isSubActivity && initialData?.id && (
+            <div className="pt-2 border-t border-border">
+              <PhotoUploader
+                activityId={initialData.id}
+                onOpenGallery={(idx) => setGalleryOpenAt(idx)}
+              />
+            </div>
+          )}
+
           {/* ============ 메모 ============ */}
           <div>
             <Label>메모</Label>
@@ -850,6 +872,14 @@ function ActivityForm({
           initialKeyword={name}
           onSelect={handlePlaceSelect}
           onClose={() => setShowPlaceSearch(false)}
+        />
+      )}
+      {galleryOpenAt !== null && photos.length > 0 && (
+        <PhotoGallery
+          photos={photos}
+          urlMap={urlMap}
+          startIndex={galleryOpenAt}
+          onClose={() => setGalleryOpenAt(null)}
         />
       )}
     </>
