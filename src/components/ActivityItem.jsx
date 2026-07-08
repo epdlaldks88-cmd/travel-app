@@ -188,6 +188,7 @@ function ActivityItem({
         tripId={tripId}
         tripStartDate={tripStartDate}
         tripEndDate={tripEndDate}
+        previousActivity={null}
         previousActivityName={previousActivityName}
         onSubmit={(payload) => onSubmitForm(payload, activity)}
         onCancel={onCancelForm}

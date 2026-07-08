@@ -63,6 +63,8 @@ const NULLABLE_NUMBER_FIELDS = [
   "totalCost",
   "homeGpsLat",
   "homeGpsLng",
+  "originGpsLat",
+  "originGpsLng",
 ];
 
 /**
@@ -184,6 +186,11 @@ export async function createActivity(tripId, data) {
     gpsLng: data.gpsLng ?? null,
     createdAt: timestamp,
     updatedAt: timestamp,
+    // 길찾기
+    origin: data.origin || "",
+    originGpsLat: data.originGpsLat ?? null,
+    originGpsLng: data.originGpsLng ?? null,
+    transport: data.transport || "",
   });
 
   await db.activities.add(entity);

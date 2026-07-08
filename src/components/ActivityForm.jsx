@@ -16,22 +16,21 @@ import {
   IconShoppingBag,
   IconHome,
   IconHistory,
+  IconCompass,
+  IconLoader2,
 } from "@tabler/icons-react";
 import { CUISINES, FOOD_TYPES, MEAL_TYPES } from "../data/foods";
 import { Button, Card, Chip, Input, Textarea, Label, Rating } from "./ui";
 import PlaceSearchModal from "./PlaceSearchModal";
+import { useProfile, useAccommodations } from "../data/hooks";
+import { useToast } from "./Toast";
 import {
-  useProfile,
-  useAccommodations,
-  useActivityPhotos,
-  usePhotoUrls,
-} from "../data/hooks";
-import PhotoUploader from "./PhotoUploader";
-import PhotoGallery from "./PhotoGallery";
+  getDirections,
+  getPriorityForTransport,
+  secondsToHM,
+  metersToKm,
+} from "../lib/kakaoDirections";
 
-/**
- * 부모 활동 카테고리 5개
- */
 const ACTIVITY_TYPES = [
   { value: "관광지", icon: IconMapPin },
   { value: "식당", icon: IconToolsKitchen2 },
@@ -40,9 +39,6 @@ const ACTIVITY_TYPES = [
   { value: "기타", icon: IconBookmark },
 ];
 
-/**
- * 자식 활동 카테고리 5개 (렌트카/숙소 제외, 카페/쇼핑 추가)
- */
 const SUB_ACTIVITY_TYPES_OPTIONS = [
   { value: "관광", icon: IconMapPin },
   { value: "식당", icon: IconToolsKitchen2 },
@@ -70,6 +66,7 @@ function ActivityForm({
   tripId,
   tripStartDate,
   tripEndDate,
+  previousActivity,
   previousActivityName,
   onSubmit,
   onCancel,
@@ -82,12 +79,11 @@ function ActivityForm({
 
   const profile = useProfile();
   const hasHome = !!profile?.homeAddress || !!profile?.homeName;
-
   const accommodations = useAccommodations(tripId) || [];
+  const toast = useToast();
 
   const [type, setType] = useState(initialData?.type ?? defaultType);
 
-  // 공통
   const [date, setDate] = useState(
     initialData?.date ??
       (isSubActivity ? (parentActivity?.date ?? "") : (tripStartDate ?? "")),
@@ -99,13 +95,17 @@ function ActivityForm({
   const [memo, setMemo] = useState(initialData?.memo ?? "");
   const [rating, setRating] = useState(initialData?.rating ?? 0);
 
-  // 장소 (공통)
   const [name, setName] = useState(initialData?.name ?? "");
   const [location, setLocation] = useState(initialData?.location ?? "");
 
-  // 이동 정보 — 프리셋 칩으로 출발지 채움
-  // presetSource: null(직접입력) | "home" | "previous" | { kind: "accommodation", id }
+  // 출발지 + GPS (프리셋으로 채워지면 함께 저장)
   const [origin, setOrigin] = useState(initialData?.origin ?? "");
+  const [originGpsLat, setOriginGpsLat] = useState(
+    initialData?.originGpsLat ?? null,
+  );
+  const [originGpsLng, setOriginGpsLng] = useState(
+    initialData?.originGpsLng ?? null,
+  );
   const [presetSource, setPresetSource] = useState(null);
 
   const [transport, setTransport] = useState(initialData?.transport ?? "");
@@ -119,7 +119,9 @@ function ActivityForm({
     initialData?.distanceKm != null ? String(initialData.distanceKm) : "",
   );
 
-  // 식당 전용
+  // 자동 계산 중 상태
+  const [calculating, setCalculating] = useState(false);
+
   const [mealType, setMealType] = useState(initialData?.mealType ?? "");
   const [cuisines, setCuisines] = useState(initialData?.cuisines ?? []);
   const [foodTypes, setFoodTypes] = useState(initialData?.foodTypes ?? []);
@@ -127,29 +129,21 @@ function ActivityForm({
     initialData?.foodDetails ?? "",
   );
 
-  // 숙소 이벤트: 참조된 숙소 id
   const [accommodationId, setAccommodationId] = useState(
     initialData?.accommodationId ?? null,
   );
 
-  // 렌트카 전용
   const [days, setDays] = useState(
     initialData?.days ? String(initialData.days) : "",
   );
   const [returnTime, setReturnTime] = useState(initialData?.returnTime ?? "");
   const [carModel, setCarModel] = useState(initialData?.carModel ?? "");
 
-  // 장소 검색 모달
   const [showPlaceSearch, setShowPlaceSearch] = useState(false);
   const [gpsLat, setGpsLat] = useState(initialData?.gpsLat ?? null);
   const [gpsLng, setGpsLng] = useState(initialData?.gpsLng ?? null);
 
-  // 사진 갤러리 열기 상태 (편집 모드 전용)
-  const [galleryOpenAt, setGalleryOpenAt] = useState(null);
-  const photos = useActivityPhotos(isEditing ? initialData?.id : null) || [];
-  const urlMap = usePhotoUrls(photos);
-
-  /* ─── type별 라벨/placeholder ─────────────────────────── */
+  /* ─── type별 라벨/placeholder ─── */
   const getNameLabel = () => {
     if (isSubActivity) return "이름";
     if (type === "식당") return "식당명";
@@ -167,14 +161,8 @@ function ActivityForm({
     return "예: 서핑 강습";
   };
   const getLocationLabel = () => (type === "렌트카" ? "대여점 위치" : "위치");
-  const getTimeLabel = () => {
-    if (type === "렌트카") return "대여 시각";
-    return "시간";
-  };
-  const getDateLabel = () => {
-    if (type === "렌트카") return "대여 날짜";
-    return "날짜";
-  };
+  const getTimeLabel = () => (type === "렌트카" ? "대여 시각" : "시간");
+  const getDateLabel = () => (type === "렌트카" ? "대여 날짜" : "날짜");
 
   const getComputedEndDate = (n) => {
     if (!date || !n || Number(n) < 1) return "";
@@ -189,19 +177,29 @@ function ActivityForm({
     );
   };
 
+  /* ─── 프리셋 핸들러 (GPS 함께 세팅) ─── */
+
+  const clearOriginGps = () => {
+    setOriginGpsLat(null);
+    setOriginGpsLng(null);
+  };
+
   const handleOriginChange = (e) => {
     setOrigin(e.target.value);
     setPresetSource(null);
+    clearOriginGps(); // 직접 입력하면 GPS 무효화
   };
 
   const handlePickHome = () => {
     if (presetSource === "home") {
       setOrigin("");
       setPresetSource(null);
+      clearOriginGps();
       return;
     }
-    const homeName = profile?.homeName || "우리집";
-    setOrigin(homeName);
+    setOrigin(profile?.homeName || "우리집");
+    setOriginGpsLat(profile?.homeGpsLat ?? null);
+    setOriginGpsLng(profile?.homeGpsLng ?? null);
     setPresetSource("home");
   };
 
@@ -209,9 +207,12 @@ function ActivityForm({
     if (presetSource === "previous") {
       setOrigin("");
       setPresetSource(null);
+      clearOriginGps();
       return;
     }
     setOrigin(previousActivityName);
+    setOriginGpsLat(previousActivity?.gpsLat ?? null);
+    setOriginGpsLng(previousActivity?.gpsLng ?? null);
     setPresetSource("previous");
   };
 
@@ -224,9 +225,12 @@ function ActivityForm({
     ) {
       setOrigin("");
       setPresetSource(null);
+      clearOriginGps();
       return;
     }
     setOrigin(acc.name);
+    setOriginGpsLat(acc.gpsLat ?? null);
+    setOriginGpsLng(acc.gpsLng ?? null);
     setPresetSource({ kind: "accommodation", id: acc.id });
   };
 
@@ -240,7 +244,6 @@ function ActivityForm({
 
   const handlePickAccommodation = (acc) => {
     if (accommodationId === acc.id) {
-      // 다시 클릭 → 해제
       setAccommodationId(null);
       setName("");
       setLocation("");
@@ -261,13 +264,56 @@ function ActivityForm({
     presetSource.kind === "accommodation" &&
     presetSource.id === accId;
 
+  /* ─── 자동 계산 ─── */
+
+  const canAutoCalculate =
+    originGpsLat != null &&
+    originGpsLng != null &&
+    gpsLat != null &&
+    gpsLng != null &&
+    getPriorityForTransport(transport) !== null;
+
+  const autoCalculateReason = () => {
+    if (originGpsLat == null || originGpsLng == null)
+      return "출발지를 프리셋에서 선택해 주세요";
+    if (gpsLat == null || gpsLng == null)
+      return "목적지를 장소 검색 또는 우리집으로 지정해 주세요";
+    if (getPriorityForTransport(transport) === null)
+      return "자차/택시/렌트카일 때만 지원됩니다";
+    return "";
+  };
+
+  const handleAutoCalculate = async () => {
+    if (!canAutoCalculate) return;
+    setCalculating(true);
+    try {
+      const result = await getDirections({
+        originLat: originGpsLat,
+        originLng: originGpsLng,
+        destLat: gpsLat,
+        destLng: gpsLng,
+        priority: getPriorityForTransport(transport),
+      });
+      const { hours, minutes } = secondsToHM(result.durationSec);
+      const km = metersToKm(result.distanceMeters);
+      setDurationHours(String(hours));
+      setDurationMinutes(String(minutes));
+      setDistanceKm(String(km));
+      toast.success(`자동 계산 완료: ${km}km · 약 ${hours}시간 ${minutes}분`);
+    } catch (err) {
+      console.error("[directions] 자동 계산 실패:", err);
+      toast.error("자동 계산 실패: " + (err.message || "네트워크 오류"));
+    } finally {
+      setCalculating(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!name.trim()) {
       alert("이름을 입력하세요");
       return;
     }
 
-    // 자식 모드
     if (isSubActivity) {
       let subPayload = {
         type,
@@ -290,7 +336,6 @@ function ActivityForm({
       return;
     }
 
-    // 부모 모드
     const base = {
       type,
       date,
@@ -301,6 +346,8 @@ function ActivityForm({
       name,
       location,
       origin,
+      originGpsLat,
+      originGpsLng,
       transport,
       durationHours: durationHours ? Number(durationHours) : 0,
       durationMinutes: durationMinutes ? Number(durationMinutes) : 0,
@@ -368,7 +415,7 @@ function ActivityForm({
             </div>
           </div>
 
-          {/* ============ 날짜 · 시간 (부모만 상단 배치) ============ */}
+          {/* ============ 날짜 · 시간 (부모만) ============ */}
           {!isSubActivity && (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -392,7 +439,7 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 숙소 이벤트 전용 — 참조 숙소 선택 ============ */}
+          {/* ============ 숙소 이벤트 참조 ============ */}
           {isAccommodationEvent && (
             <div>
               <Label>숙소 선택</Label>
@@ -420,7 +467,7 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 이름 (공통) ============ */}
+          {/* ============ 이름 ============ */}
           <div>
             <Label>{getNameLabel()}</Label>
             {!isSubActivity ? (
@@ -433,7 +480,6 @@ function ActivityForm({
                     disabled={isAccommodationEvent}
                   />
                 </div>
-                {/* 숙소 이벤트일 땐 우리집/검색 버튼 숨김 (참조 방식) */}
                 {!isAccommodationEvent && hasHome && (
                   <button
                     type="button"
@@ -466,7 +512,7 @@ function ActivityForm({
             )}
           </div>
 
-          {/* ============ 위치 (부모만) ============ */}
+          {/* ============ 위치 ============ */}
           {!isSubActivity && (
             <div>
               <Label>{getLocationLabel()}</Label>
@@ -479,7 +525,7 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 이동 정보 (부모만) ============ */}
+          {/* ============ 이동 정보 ============ */}
           {!isSubActivity && (
             <div className="pt-2 border-t border-border">
               <p className="text-xs text-text-muted mb-2 tracking-wide">
@@ -490,7 +536,6 @@ function ActivityForm({
                 <div>
                   <Label>출발지</Label>
 
-                  {/* 프리셋 칩 */}
                   {(hasHome ||
                     previousActivityName ||
                     accommodations.length > 0) && (
@@ -565,7 +610,27 @@ function ActivityForm({
                 </div>
 
                 <div>
-                  <Label>소요 시간 · 거리</Label>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="mb-0">소요 시간 · 거리</Label>
+                    <button
+                      type="button"
+                      onClick={handleAutoCalculate}
+                      disabled={!canAutoCalculate || calculating}
+                      title={
+                        canAutoCalculate
+                          ? "카카오 지도 기반 자동 계산"
+                          : autoCalculateReason()
+                      }
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-accent bg-accent/10 hover:bg-accent/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {calculating ? (
+                        <IconLoader2 size={12} className="animate-spin" />
+                      ) : (
+                        <IconCompass size={12} />
+                      )}
+                      자동 계산
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Input
                       type="number"
@@ -600,12 +665,17 @@ function ActivityForm({
                     />
                     <span className="text-xs text-text-muted">km</span>
                   </div>
+                  {!canAutoCalculate && (
+                    <p className="text-[10px] text-text-subtle mt-1">
+                      자동 계산 조건: {autoCalculateReason()}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* ============ 시간 (자식 모드 단독) ============ */}
+          {/* ============ 시간 (자식) ============ */}
           {isSubActivity && (
             <div className="pt-2 border-t border-border">
               <Label>시간</Label>
@@ -617,7 +687,7 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 식당 전용 (부모 + 자식 공통) ============ */}
+          {/* ============ 식당 정보 ============ */}
           {type === "식당" && (
             <div className="pt-2 border-t border-border space-y-3">
               <p className="text-xs text-text-muted tracking-wide">식당 정보</p>
@@ -680,7 +750,7 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 렌트카 전용 (부모만) ============ */}
+          {/* ============ 렌트카 정보 ============ */}
           {!isSubActivity && type === "렌트카" && (
             <div className="pt-2 border-t border-border space-y-3">
               <p className="text-xs text-text-muted tracking-wide">
@@ -728,7 +798,7 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 비용 · 평점 (공통) ============ */}
+          {/* ============ 비용 · 평점 ============ */}
           <div>
             <Label>
               {!isSubActivity && type === "렌트카"
@@ -747,16 +817,6 @@ function ActivityForm({
             <Label>평점</Label>
             <Rating value={rating} onChange={setRating} size="lg" />
           </div>
-
-          {/* ============ 사진 (편집 모드 · 부모만) ============ */}
-          {isEditing && !isSubActivity && initialData?.id && (
-            <div className="pt-2 border-t border-border">
-              <PhotoUploader
-                activityId={initialData.id}
-                onOpenGallery={(idx) => setGalleryOpenAt(idx)}
-              />
-            </div>
-          )}
 
           {/* ============ 메모 ============ */}
           <div>
@@ -790,14 +850,6 @@ function ActivityForm({
           initialKeyword={name}
           onSelect={handlePlaceSelect}
           onClose={() => setShowPlaceSearch(false)}
-        />
-      )}
-      {galleryOpenAt !== null && photos.length > 0 && (
-        <PhotoGallery
-          photos={photos}
-          urlMap={urlMap}
-          startIndex={galleryOpenAt}
-          onClose={() => setGalleryOpenAt(null)}
         />
       )}
     </>

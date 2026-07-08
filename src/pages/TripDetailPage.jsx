@@ -435,6 +435,9 @@ function TripDetailPage() {
               tripId={id}
               tripStartDate={trip.startDate}
               tripEndDate={trip.endDate}
+              previousActivity={
+                activities.length > 0 ? activities[activities.length - 1] : null
+              }
               previousActivityName={
                 activities.length > 0
                   ? activities[activities.length - 1].name
