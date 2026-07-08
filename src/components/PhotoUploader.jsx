@@ -118,7 +118,6 @@ function PhotoUploader({ activityId, onOpenGallery }) {
         type="file"
         accept="image/*"
         multiple
-        capture="environment"
         onChange={handleFileChange}
         className="hidden"
       />
