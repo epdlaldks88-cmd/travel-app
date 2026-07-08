@@ -15,15 +15,24 @@ import {
 } from "@tabler/icons-react";
 import ActivityForm from "../components/ActivityForm";
 import ActivityItem from "../components/ActivityItem";
+import AccommodationForm from "../components/AccommodationForm";
+import AccommodationItem from "../components/AccommodationItem";
+import DayNoteCard from "../components/DayNoteCard";
 import { Button, Card, Rating, Textarea } from "../components/ui";
 import {
   useTrip,
   useActivities,
+  useAccommodations,
+  useDayNotes,
   useUpdateTrip,
   useCreateActivity,
   useUpdateActivity,
   useDeleteActivity,
   useCreateSubActivity,
+  useCreateAccommodation,
+  useUpdateAccommodation,
+  useDeleteAccommodation,
+  useUpsertDayNote,
 } from "../data/hooks";
 import { calcTripTotal } from "../data/calc";
 
@@ -33,6 +42,8 @@ function TripDetailPage() {
 
   const trip = useTrip(id);
   const activities = useActivities(id);
+  const accommodations = useAccommodations(id);
+  const dayNotes = useDayNotes(id);
 
   const updateTrip = useUpdateTrip();
   const createActivity = useCreateActivity();
@@ -40,13 +51,23 @@ function TripDetailPage() {
   const deleteActivity = useDeleteActivity();
   const createSubActivity = useCreateSubActivity();
 
+  const createAccommodation = useCreateAccommodation();
+  const updateAccommodation = useUpdateAccommodation();
+  const deleteAccommodation = useDeleteAccommodation();
+
+  const upsertDayNote = useUpsertDayNote();
+
   const [memo, setMemo] = useState("");
   const [rating, setRating] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  // 편집 · 자식 추가 상태
+  // 편집 · 자식 추가 상태 (액티비티)
   const [editingId, setEditingId] = useState(null);
   const [subFormParentId, setSubFormParentId] = useState(null);
+
+  // 편집 상태 (숙소)
+  const [editingAccId, setEditingAccId] = useState(null);
+  const [showAccForm, setShowAccForm] = useState(false);
 
   // 정렬 상태
   const [sortOrder, setSortOrder] = useState("asc");
@@ -62,7 +83,7 @@ function TripDetailPage() {
     }
   }, [trip?.id]);
 
-  // ⭐ 새 액티비티 폼 열릴 때 상단 스크롤 (FAB/헤더 추가 버튼 공통)
+  // ⭐ 새 액티비티 폼 열릴 때 상단 스크롤
   useEffect(() => {
     if (showActivityForm) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -77,6 +98,30 @@ function TripDetailPage() {
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
+
+  // 여행 일수 리스트 (startDate ~ endDate)
+  const tripDays = useMemo(() => {
+    if (!trip?.startDate || !trip?.endDate) return [];
+    const days = [];
+    const start = new Date(trip.startDate);
+    const end = new Date(trip.endDate);
+    const oneDay = 24 * 60 * 60 * 1000;
+    for (let d = start; d <= end; d = new Date(d.getTime() + oneDay)) {
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }, [trip?.startDate, trip?.endDate]);
+
+  // 날짜별 노트 매핑
+  const noteByDate = useMemo(() => {
+    const map = new Map();
+    for (const note of dayNotes || []) {
+      map.set(note.date, note);
+    }
+    return map;
+  }, [dayNotes]);
+
+  /* ─── 액티비티 핸들러 ─────────────────────────── */
 
   const handleSubmitForm = async (payload, editingActivity) => {
     if (editingActivity) {
@@ -125,6 +170,47 @@ function TripDetailPage() {
     if (subFormParentId === activityId) setSubFormParentId(null);
   };
 
+  /* ─── 숙소 핸들러 ─────────────────────────── */
+
+  const handleStartAddAccommodation = () => {
+    setEditingAccId(null);
+    setShowAccForm(true);
+  };
+
+  const handleCancelAccommodationForm = () => {
+    setShowAccForm(false);
+    setEditingAccId(null);
+  };
+
+  const handleStartEditAccommodation = (acc) => {
+    setShowAccForm(false);
+    setEditingAccId(acc.id);
+  };
+
+  const handleSubmitAccommodationForm = async (payload, editingAcc) => {
+    if (editingAcc) {
+      await updateAccommodation(editingAcc.id, payload);
+      setEditingAccId(null);
+    } else {
+      await createAccommodation(id, payload);
+      setShowAccForm(false);
+    }
+  };
+
+  const handleDeleteAccommodation = async (accId) => {
+    if (!confirm("이 숙소를 삭제하시겠습니까?")) return;
+    await deleteAccommodation(accId);
+    if (editingAccId === accId) setEditingAccId(null);
+  };
+
+  /* ─── DayNote 핸들러 ─────────────────────────── */
+
+  const handleSaveDayNote = async (date, patch) => {
+    await upsertDayNote(id, date, patch);
+  };
+
+  /* ─── Trip 저장 ─────────────────────────── */
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -158,11 +244,14 @@ function TripDetailPage() {
   }
 
   const totalCost = calcTripTotal(activities);
+  const accommodationsList = accommodations || [];
 
   const formatFull = (dateStr) => {
     if (!dateStr) return "";
     return dateStr.replaceAll("-", ".");
   };
+
+  const filledNoteCount = tripDays.filter((d) => noteByDate.has(d)).length;
 
   return (
     <div className="-mt-4 -mx-4">
@@ -216,6 +305,57 @@ function TripDetailPage() {
       </div>
 
       <div className="p-4">
+        {/* ═══════════════ 숙소 섹션 ═══════════════ */}
+        <section className="mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="font-heading text-sm font-medium text-text">
+              숙소 ({accommodationsList.length})
+            </h2>
+            {!showAccForm && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleStartAddAccommodation}
+                leftIcon={<IconPlus size={14} />}
+              >
+                추가
+              </Button>
+            )}
+          </div>
+
+          {showAccForm && (
+            <AccommodationForm
+              tripStartDate={trip.startDate}
+              tripEndDate={trip.endDate}
+              onSubmit={(payload) =>
+                handleSubmitAccommodationForm(payload, null)
+              }
+              onCancel={handleCancelAccommodationForm}
+            />
+          )}
+
+          {accommodationsList.length === 0 && !showAccForm && (
+            <Card padding="lg" className="text-center text-text-subtle text-sm">
+              등록된 숙소가 없습니다
+            </Card>
+          )}
+
+          {accommodationsList.map((acc) => (
+            <AccommodationItem
+              key={acc.id}
+              accommodation={acc}
+              editingId={editingAccId}
+              tripStartDate={trip.startDate}
+              tripEndDate={trip.endDate}
+              onStartEdit={handleStartEditAccommodation}
+              onSubmitForm={handleSubmitAccommodationForm}
+              onCancelForm={handleCancelAccommodationForm}
+              onDelete={handleDeleteAccommodation}
+            />
+          ))}
+        </section>
+
+        {/* ═══════════════ 일정 섹션 ═══════════════ */}
         <section className="mb-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-heading text-sm font-medium text-text">
@@ -258,6 +398,7 @@ function TripDetailPage() {
 
           {showActivityForm && (
             <ActivityForm
+              tripId={id}
               tripStartDate={trip.startDate}
               tripEndDate={trip.endDate}
               previousActivityName={
@@ -287,12 +428,34 @@ function TripDetailPage() {
               onStartAddSub={handleStartAddSub}
               onSubmitForm={handleSubmitForm}
               onCancelForm={handleCancelForm}
+              tripId={id}
               tripStartDate={trip.startDate}
               tripEndDate={trip.endDate}
               previousActivityName={null}
             />
           ))}
         </section>
+
+        {/* ═══════════════ 일별 노트 섹션 (v2 신규) ═══════════════ */}
+        {tripDays.length > 0 && (
+          <section className="mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="font-heading text-sm font-medium text-text">
+                일별 노트 ({filledNoteCount}/{tripDays.length})
+              </h2>
+            </div>
+
+            {tripDays.map((date, idx) => (
+              <DayNoteCard
+                key={date}
+                date={date}
+                dayLabel={`${idx + 1}일차`}
+                note={noteByDate.get(date)}
+                onSave={(patch) => handleSaveDayNote(date, patch)}
+              />
+            ))}
+          </section>
+        )}
 
         <Card padding="md" className="mb-4">
           <h2 className="font-heading text-sm font-medium text-text mb-3">

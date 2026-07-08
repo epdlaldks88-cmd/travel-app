@@ -132,6 +132,7 @@ function ActivityItem({
   onStartAddSub,
   onSubmitForm,
   onCancelForm,
+  tripId,
   tripStartDate,
   tripEndDate,
   previousActivityName,
@@ -168,6 +169,7 @@ function ActivityItem({
     return (
       <ActivityForm
         initialData={activity}
+        tripId={tripId}
         tripStartDate={tripStartDate}
         tripEndDate={tripEndDate}
         previousActivityName={previousActivityName}

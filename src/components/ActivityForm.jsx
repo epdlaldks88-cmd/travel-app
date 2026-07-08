@@ -20,7 +20,7 @@ import {
 import { CUISINES, FOOD_TYPES, MEAL_TYPES } from "../data/foods";
 import { Button, Card, Chip, Input, Textarea, Label, Rating } from "./ui";
 import PlaceSearchModal from "./PlaceSearchModal";
-import { useProfile } from "../data/hooks";
+import { useProfile, useAccommodations } from "../data/hooks";
 
 /**
  * 부모 활동 카테고리 5개
@@ -60,6 +60,7 @@ function ActivityForm({
   isSubActivity = false,
   parentActivity = null,
   initialData = null,
+  tripId,
   tripStartDate,
   tripEndDate,
   previousActivityName,
@@ -74,6 +75,8 @@ function ActivityForm({
 
   const profile = useProfile();
   const hasHome = !!profile?.homeAddress || !!profile?.homeName;
+
+  const accommodations = useAccommodations(tripId) || [];
 
   const [type, setType] = useState(initialData?.type ?? defaultType);
 
@@ -94,7 +97,7 @@ function ActivityForm({
   const [location, setLocation] = useState(initialData?.location ?? "");
 
   // 이동 정보 — 프리셋 칩으로 출발지 채움
-  // presetSource: null(직접입력) | "home" | "previous"
+  // presetSource: null(직접입력) | "home" | "previous" | { kind: "accommodation", id }
   const [origin, setOrigin] = useState(initialData?.origin ?? "");
   const [presetSource, setPresetSource] = useState(null);
 
@@ -117,12 +120,9 @@ function ActivityForm({
     initialData?.foodDetails ?? "",
   );
 
-  // 숙소 전용
-  const [nights, setNights] = useState(
-    initialData?.nights ? String(initialData.nights) : "",
-  );
-  const [checkoutTime, setCheckoutTime] = useState(
-    initialData?.checkoutTime ?? "",
+  // 숙소 이벤트: 참조된 숙소 id
+  const [accommodationId, setAccommodationId] = useState(
+    initialData?.accommodationId ?? null,
   );
 
   // 렌트카 전용
@@ -141,7 +141,7 @@ function ActivityForm({
   const getNameLabel = () => {
     if (isSubActivity) return "이름";
     if (type === "식당") return "식당명";
-    if (type === "숙소") return "숙소명";
+    if (type === "숙소") return "숙소";
     if (type === "관광지") return "장소명";
     if (type === "렌트카") return "업체명";
     return "이름";
@@ -149,19 +149,17 @@ function ActivityForm({
   const getNamePlaceholder = () => {
     if (isSubActivity) return "예: OO카페";
     if (type === "식당") return "예: 옛맛 칼국수";
-    if (type === "숙소") return "예: 강릉 오션뷰 호텔";
+    if (type === "숙소") return "위 목록에서 선택";
     if (type === "관광지") return "예: 안목해변";
     if (type === "렌트카") return "예: SK렌터카 강릉점";
     return "예: 서핑 강습";
   };
   const getLocationLabel = () => (type === "렌트카" ? "대여점 위치" : "위치");
   const getTimeLabel = () => {
-    if (type === "숙소") return "체크인 시각";
     if (type === "렌트카") return "대여 시각";
     return "시간";
   };
   const getDateLabel = () => {
-    if (type === "숙소") return "체크인 날짜";
     if (type === "렌트카") return "대여 날짜";
     return "날짜";
   };
@@ -181,12 +179,11 @@ function ActivityForm({
 
   const handleOriginChange = (e) => {
     setOrigin(e.target.value);
-    setPresetSource(null); // 직접 수정하면 프리셋 해제
+    setPresetSource(null);
   };
 
   const handlePickHome = () => {
     if (presetSource === "home") {
-      // 이미 선택된 상태면 해제
       setOrigin("");
       setPresetSource(null);
       return;
@@ -206,13 +203,59 @@ function ActivityForm({
     setPresetSource("previous");
   };
 
+  const handlePickAccommodationAsOrigin = (acc) => {
+    if (
+      presetSource &&
+      typeof presetSource === "object" &&
+      presetSource.kind === "accommodation" &&
+      presetSource.id === acc.id
+    ) {
+      setOrigin("");
+      setPresetSource(null);
+      return;
+    }
+    setOrigin(acc.name);
+    setPresetSource({ kind: "accommodation", id: acc.id });
+  };
+
+  const handleFillHomeAsDestination = () => {
+    if (!profile) return;
+    setName(profile.homeName || "우리집");
+    setLocation(profile.homeAddress || "");
+    setGpsLat(profile.homeGpsLat ?? null);
+    setGpsLng(profile.homeGpsLng ?? null);
+  };
+
+  const handlePickAccommodation = (acc) => {
+    if (accommodationId === acc.id) {
+      // 다시 클릭 → 해제
+      setAccommodationId(null);
+      setName("");
+      setLocation("");
+      setGpsLat(null);
+      setGpsLng(null);
+      return;
+    }
+    setAccommodationId(acc.id);
+    setName(acc.name);
+    setLocation(acc.location || "");
+    setGpsLat(acc.gpsLat ?? null);
+    setGpsLng(acc.gpsLng ?? null);
+  };
+
+  const isAccommodationPreset = (accId) =>
+    presetSource &&
+    typeof presetSource === "object" &&
+    presetSource.kind === "accommodation" &&
+    presetSource.id === accId;
+
   const handleSubmit = () => {
     if (!name.trim()) {
       alert("이름을 입력하세요");
       return;
     }
 
-    // 자식 모드: 축소 payload (식당일 때 식당 정보 포함)
+    // 자식 모드
     if (isSubActivity) {
       let subPayload = {
         type,
@@ -252,13 +295,12 @@ function ActivityForm({
       distanceKm: distanceKm ? Number(distanceKm) : null,
       gpsLat,
       gpsLng,
+      accommodationId: type === "숙소" ? accommodationId : null,
     };
 
     let payload = base;
     if (type === "식당") {
       payload = { ...base, mealType, cuisines, foodTypes, foodDetails };
-    } else if (type === "숙소") {
-      payload = { ...base, nights: nights ? Number(nights) : 1, checkoutTime };
     } else if (type === "렌트카") {
       payload = {
         ...base,
@@ -278,14 +320,6 @@ function ActivityForm({
     setGpsLng(place.lng);
   };
 
-  const handleFillHomeAsDestination = () => {
-    if (!profile) return;
-    setName(profile.homeName || "우리집");
-    setLocation(profile.homeAddress || "");
-    setGpsLat(profile.homeGpsLat ?? null);
-    setGpsLng(profile.homeGpsLng ?? null);
-  };
-
   const headerText = isEditing
     ? isSubActivity
       ? "세부 일정 편집"
@@ -293,6 +327,8 @@ function ActivityForm({
     : isSubActivity
       ? "새 세부 일정"
       : "새 일정 추가";
+
+  const isAccommodationEvent = !isSubActivity && type === "숙소";
 
   return (
     <>
@@ -344,6 +380,34 @@ function ActivityForm({
             </div>
           )}
 
+          {/* ============ 숙소 이벤트 전용 — 참조 숙소 선택 ============ */}
+          {isAccommodationEvent && (
+            <div>
+              <Label>숙소 선택</Label>
+              {accommodations.length === 0 ? (
+                <div className="text-xs text-text-muted p-3 rounded-lg bg-surface-alt border border-border">
+                  등록된 숙소가 없습니다. 먼저 상단 "숙소" 섹션에서 숙소를
+                  추가해 주세요.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {accommodations.map((acc) => (
+                    <Chip
+                      key={acc.id}
+                      variant={
+                        accommodationId === acc.id ? "selected" : "default"
+                      }
+                      onClick={() => handlePickAccommodation(acc)}
+                      icon={<IconBuilding size={14} />}
+                    >
+                      {acc.name}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ============ 이름 (공통) ============ */}
           <div>
             <Label>{getNameLabel()}</Label>
@@ -354,9 +418,11 @@ function ActivityForm({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={getNamePlaceholder()}
+                    disabled={isAccommodationEvent}
                   />
                 </div>
-                {hasHome && (
+                {/* 숙소 이벤트일 땐 우리집/검색 버튼 숨김 (참조 방식) */}
+                {!isAccommodationEvent && hasHome && (
                   <button
                     type="button"
                     onClick={handleFillHomeAsDestination}
@@ -367,15 +433,17 @@ function ActivityForm({
                     <IconHome size={18} />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setShowPlaceSearch(true)}
-                  aria-label="장소 검색"
-                  title="카카오 지도에서 검색"
-                  className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted hover:text-text hover:bg-surface border border-border transition-colors"
-                >
-                  <IconLocationSearch size={18} />
-                </button>
+                {!isAccommodationEvent && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPlaceSearch(true)}
+                    aria-label="장소 검색"
+                    title="카카오 지도에서 검색"
+                    className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted hover:text-text hover:bg-surface border border-border transition-colors"
+                  >
+                    <IconLocationSearch size={18} />
+                  </button>
+                )}
               </div>
             ) : (
               <Input
@@ -394,6 +462,7 @@ function ActivityForm({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="예: 강원도 강릉시 창해로 123"
+                disabled={isAccommodationEvent}
               />
             </div>
           )}
@@ -410,7 +479,9 @@ function ActivityForm({
                   <Label>출발지</Label>
 
                   {/* 프리셋 칩 */}
-                  {(hasHome || previousActivityName) && (
+                  {(hasHome ||
+                    previousActivityName ||
+                    accommodations.length > 0) && (
                     <div className="flex flex-wrap gap-2 mb-2">
                       {hasHome && (
                         <Chip
@@ -434,6 +505,20 @@ function ActivityForm({
                           이전: {previousActivityName}
                         </Chip>
                       )}
+                      {accommodations.map((acc) => (
+                        <Chip
+                          key={acc.id}
+                          variant={
+                            isAccommodationPreset(acc.id)
+                              ? "selected"
+                              : "default"
+                          }
+                          onClick={() => handlePickAccommodationAsOrigin(acc)}
+                          icon={<IconBuilding size={14} />}
+                        >
+                          {acc.name}
+                        </Chip>
+                      ))}
                     </div>
                   )}
 
@@ -583,43 +668,6 @@ function ActivityForm({
             </div>
           )}
 
-          {/* ============ 숙소 전용 (부모만) ============ */}
-          {!isSubActivity && type === "숙소" && (
-            <div className="pt-2 border-t border-border space-y-3">
-              <p className="text-xs text-text-muted tracking-wide">숙소 정보</p>
-
-              <div>
-                <Label>박 수</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={nights}
-                    onChange={(e) => setNights(e.target.value)}
-                    placeholder="1"
-                    min="1"
-                    size="sm"
-                    className="w-20 text-center"
-                  />
-                  <span className="text-xs text-text-muted">박</span>
-                  {nights && Number(nights) >= 1 && date && (
-                    <span className="text-xs text-text-muted">
-                      체크아웃: {getComputedEndDate(nights)}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label>체크아웃 시각 (선택)</Label>
-                <Input
-                  type="time"
-                  value={checkoutTime}
-                  onChange={(e) => setCheckoutTime(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
           {/* ============ 렌트카 전용 (부모만) ============ */}
           {!isSubActivity && type === "렌트카" && (
             <div className="pt-2 border-t border-border space-y-3">
@@ -671,7 +719,7 @@ function ActivityForm({
           {/* ============ 비용 · 평점 (공통) ============ */}
           <div>
             <Label>
-              {!isSubActivity && (type === "숙소" || type === "렌트카")
+              {!isSubActivity && type === "렌트카"
                 ? "총 비용 (원)"
                 : "비용 (원)"}
             </Label>
@@ -694,7 +742,11 @@ function ActivityForm({
             <Textarea
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="선택 사항"
+              placeholder={
+                isAccommodationEvent
+                  ? "예: 체크인, 사우나 이용, 밤 복귀"
+                  : "선택 사항"
+              }
               rows={2}
               className="resize-none"
             />
