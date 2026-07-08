@@ -17,10 +17,14 @@ import {
   IconPlus,
   IconCoffee,
   IconShoppingBag,
+  IconPhoto,
 } from "@tabler/icons-react";
+import { useState } from "react";
 import { Rating } from "./ui";
 import ActivityForm from "./ActivityForm";
+import PhotoGallery from "./PhotoGallery";
 import { calcActivityTotal, hasChildrenCost } from "../data/calc";
+import { useActivityPhotos, usePhotoUrls } from "../data/hooks";
 
 const TYPE_ICONS = {
   관광지: IconMapPin,
@@ -164,6 +168,18 @@ function ActivityItem({
   const isEditingThisParent = editingId === activity.id;
   const isAddingSubToThis = subFormParentId === activity.id;
 
+  // ⭐ 사진 (부모 액티비티만, 편집 모드 아닐 때만 조회)
+  const isParent = !activity.parentActivityId;
+  const photos =
+    useActivityPhotos(isParent && !isEditingThisParent ? activity.id : null) ||
+    [];
+  const urlMap = usePhotoUrls(photos);
+  const firstPhoto = photos[0];
+  const firstPhotoUrl = firstPhoto ? urlMap[firstPhoto.storagePath] : null;
+
+  // 갤러리 열기 상태
+  const [galleryOpenAt, setGalleryOpenAt] = useState(null);
+
   // 부모 편집 중이면 카드 전체를 폼으로 대체 (자식들도 안 보임)
   if (isEditingThisParent) {
     return (
@@ -180,201 +196,243 @@ function ActivityItem({
   }
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-3 mb-2 relative">
-      <div className="flex gap-3">
-        {/* ─── 좌측: 시간 · 타입 아이콘 ────────────────── */}
-        <div className="flex flex-col items-center gap-1 min-w-[42px]">
-          {activity.time && (
-            <span className="text-[11px] text-text-muted">{activity.time}</span>
-          )}
-          <div className="w-7 h-7 rounded-md flex items-center justify-center bg-surface-alt text-text-muted">
-            <Icon size={16} />
-          </div>
-        </div>
-
-        {/* ─── 중앙: 내용 ──────────────────────────────── */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <MiniBadge>{activity.type}</MiniBadge>
-            {nightsDisplay && (
-              <MiniBadge variant="accent">{nightsDisplay}</MiniBadge>
+    <>
+      <div className="bg-surface border border-border rounded-lg mb-2 relative overflow-hidden">
+        {/* ─── 상단 대표 사진 (있을 때만) ─── */}
+        {firstPhotoUrl && (
+          <button
+            type="button"
+            onClick={() => setGalleryOpenAt(0)}
+            className="block w-full aspect-video relative bg-surface-alt"
+            aria-label="사진 크게 보기"
+          >
+            <img
+              src={firstPhotoUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+            {photos.length > 1 && (
+              <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/50 text-white text-[10px] flex items-center gap-1">
+                <IconPhoto size={11} />
+                {photos.length}
+              </span>
             )}
-            {rentalDaysDisplay && (
-              <MiniBadge variant="accent">{rentalDaysDisplay}</MiniBadge>
-            )}
-            {activity.rating > 0 && (
-              <Rating value={activity.rating} readonly size="sm" />
-            )}
-          </div>
+          </button>
+        )}
 
-          <h4 className="font-heading text-sm font-medium text-text">
-            {activity.name}
-          </h4>
-
-          {hasMovement && (
-            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap text-[11px] text-text-muted">
-              {activity.origin && (
-                <>
-                  <span className="text-text">{activity.origin}</span>
-                  <IconArrowNarrowRight
-                    size={12}
-                    className="text-text-subtle"
-                  />
-                </>
-              )}
-              {TransportIcon && <TransportIcon size={12} />}
-              {activity.transport && <span>{activity.transport}</span>}
-              {duration && (
-                <>
-                  {activity.transport && (
-                    <span className="text-text-subtle">·</span>
-                  )}
-                  <span>{duration}</span>
-                </>
-              )}
-              {activity.distanceKm > 0 && (
-                <>
-                  <span className="text-text-subtle">·</span>
-                  <span>{activity.distanceKm}km</span>
-                </>
-              )}
-            </div>
-          )}
-
-          {activity.type === "렌트카" && activity.carModel && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-1">
-              <IconCar size={11} />
-              {activity.carModel}
-            </p>
-          )}
-
-          {mealTags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {mealTags.map((tag, i) => (
-                <span
-                  key={i}
-                  className="px-1.5 py-0.5 rounded-full text-[10px] bg-accent/10 text-accent"
-                >
-                  {tag}
+        {/* ─── 본문 ─── */}
+        <div className="p-3">
+          <div className="flex gap-3">
+            {/* ─── 좌측: 시간 · 타입 아이콘 ─── */}
+            <div className="flex flex-col items-center gap-1 min-w-[42px]">
+              {activity.time && (
+                <span className="text-[11px] text-text-muted">
+                  {activity.time}
                 </span>
-              ))}
+              )}
+              <div className="w-7 h-7 rounded-md flex items-center justify-center bg-surface-alt text-text-muted">
+                <Icon size={16} />
+              </div>
+            </div>
+
+            {/* ─── 중앙: 내용 ─── */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <MiniBadge>{activity.type}</MiniBadge>
+                {nightsDisplay && (
+                  <MiniBadge variant="accent">{nightsDisplay}</MiniBadge>
+                )}
+                {rentalDaysDisplay && (
+                  <MiniBadge variant="accent">{rentalDaysDisplay}</MiniBadge>
+                )}
+                {activity.rating > 0 && (
+                  <Rating value={activity.rating} readonly size="sm" />
+                )}
+              </div>
+
+              <h4 className="font-heading text-sm font-medium text-text">
+                {activity.name}
+              </h4>
+
+              {hasMovement && (
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap text-[11px] text-text-muted">
+                  {activity.origin && (
+                    <>
+                      <span className="text-text">{activity.origin}</span>
+                      <IconArrowNarrowRight
+                        size={12}
+                        className="text-text-subtle"
+                      />
+                    </>
+                  )}
+                  {TransportIcon && <TransportIcon size={12} />}
+                  {activity.transport && <span>{activity.transport}</span>}
+                  {duration && (
+                    <>
+                      {activity.transport && (
+                        <span className="text-text-subtle">·</span>
+                      )}
+                      <span>{duration}</span>
+                    </>
+                  )}
+                  {activity.distanceKm > 0 && (
+                    <>
+                      <span className="text-text-subtle">·</span>
+                      <span>{activity.distanceKm}km</span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {activity.type === "렌트카" && activity.carModel && (
+                <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-1">
+                  <IconCar size={11} />
+                  {activity.carModel}
+                </p>
+              )}
+
+              {mealTags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {mealTags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="px-1.5 py-0.5 rounded-full text-[10px] bg-accent/10 text-accent"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {activity.type === "식당" && activity.foodDetails && (
+                <p className="inline-flex items-center gap-1 text-[11px] text-text mt-1">
+                  <IconToolsKitchen2 size={11} />
+                  {activity.foodDetails}
+                </p>
+              )}
+
+              {activity.location && (
+                <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-1">
+                  <IconMapPin size={11} />
+                  {activity.location}
+                </p>
+              )}
+
+              {activity.type === "숙소" && activity.checkoutTime && (
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  체크아웃 {activity.checkoutTime}
+                </p>
+              )}
+
+              {activity.type === "렌트카" && activity.returnTime && (
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  반납 {activity.returnTime}
+                </p>
+              )}
+
+              {activity.cost > 0 && (
+                <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-0.5">
+                  <IconCoin size={11} />
+                  {activity.cost.toLocaleString()}원
+                </p>
+              )}
+
+              {activity.memo && (
+                <p className="text-xs text-text mt-1">{activity.memo}</p>
+              )}
+            </div>
+
+            {/* ─── 우측: 편집 · 삭제 ─── */}
+            <div className="shrink-0 self-start flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => onStartEdit(activity)}
+                aria-label="일정 편집"
+                className="p-1 rounded-full text-text-subtle hover:text-text hover:bg-surface-alt transition-colors"
+              >
+                <IconPencil size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(activity.id)}
+                aria-label="일정 삭제"
+                className="p-1 rounded-full text-text-subtle hover:text-text hover:bg-surface-alt transition-colors"
+              >
+                <IconX size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* ─── 자식 섹션 ─── */}
+          {(children.length > 0 || isAddingSubToThis) && (
+            <div className="mt-2 pt-2 border-t border-border">
+              {children.map((sub) =>
+                editingId === sub.id ? (
+                  <ActivityForm
+                    key={sub.id}
+                    isSubActivity
+                    parentActivity={activity}
+                    initialData={sub}
+                    tripId={tripId}
+                    onSubmit={(payload) => onSubmitForm(payload, sub)}
+                    onCancel={onCancelForm}
+                  />
+                ) : (
+                  <SubActivityItem
+                    key={sub.id}
+                    sub={sub}
+                    onEdit={onStartEdit}
+                    onDelete={onDelete}
+                  />
+                ),
+              )}
+
+              {isAddingSubToThis && (
+                <div className="mt-2">
+                  <ActivityForm
+                    isSubActivity
+                    parentActivity={activity}
+                    tripId={tripId}
+                    onSubmit={(payload) => onSubmitForm(payload, null)}
+                    onCancel={onCancelForm}
+                  />
+                </div>
+              )}
+
+              {hasChildrenCost(activity) && (
+                <div className="mt-2 pl-6 text-xs text-text-muted inline-flex items-center gap-1">
+                  <IconCoin size={11} />총{" "}
+                  {calcActivityTotal(activity).toLocaleString()}원
+                </div>
+              )}
             </div>
           )}
 
-          {activity.type === "식당" && activity.foodDetails && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-text mt-1">
-              <IconToolsKitchen2 size={11} />
-              {activity.foodDetails}
-            </p>
+          {/* ─── + 세부 일정 추가 ─── */}
+          {!isAddingSubToThis && (
+            <button
+              type="button"
+              onClick={() => onStartAddSub(activity.id)}
+              className="mt-2 ml-6 text-xs text-text-muted hover:text-text inline-flex items-center gap-1 transition-colors"
+            >
+              <IconPlus size={12} />
+              세부 일정 추가
+            </button>
           )}
-
-          {activity.location && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-1">
-              <IconMapPin size={11} />
-              {activity.location}
-            </p>
-          )}
-
-          {activity.type === "숙소" && activity.checkoutTime && (
-            <p className="text-[11px] text-text-muted mt-0.5">
-              체크아웃 {activity.checkoutTime}
-            </p>
-          )}
-
-          {activity.type === "렌트카" && activity.returnTime && (
-            <p className="text-[11px] text-text-muted mt-0.5">
-              반납 {activity.returnTime}
-            </p>
-          )}
-
-          {activity.cost > 0 && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-text-muted mt-0.5">
-              <IconCoin size={11} />
-              {activity.cost.toLocaleString()}원
-            </p>
-          )}
-
-          {activity.memo && (
-            <p className="text-xs text-text mt-1">{activity.memo}</p>
-          )}
-        </div>
-
-        {/* ─── 우측: 편집 · 삭제 ─────────────────────── */}
-        <div className="shrink-0 self-start flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => onStartEdit(activity)}
-            aria-label="일정 편집"
-            className="p-1 rounded-full text-text-subtle hover:text-text hover:bg-surface-alt transition-colors"
-          >
-            <IconPencil size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(activity.id)}
-            aria-label="일정 삭제"
-            className="p-1 rounded-full text-text-subtle hover:text-text hover:bg-surface-alt transition-colors"
-          >
-            <IconX size={14} />
-          </button>
         </div>
       </div>
 
-      {/* ─── 자식 섹션 ─────────────────────────────────── */}
-      {(children.length > 0 || isAddingSubToThis) && (
-        <div className="mt-2 pt-2 border-t border-border">
-          {children.map((sub) =>
-            editingId === sub.id ? (
-              <ActivityForm
-                key={sub.id}
-                isSubActivity
-                parentActivity={activity}
-                initialData={sub}
-                onSubmit={(payload) => onSubmitForm(payload, sub)}
-                onCancel={onCancelForm}
-              />
-            ) : (
-              <SubActivityItem
-                key={sub.id}
-                sub={sub}
-                onEdit={onStartEdit}
-                onDelete={onDelete}
-              />
-            ),
-          )}
-
-          {isAddingSubToThis && (
-            <div className="mt-2">
-              <ActivityForm
-                isSubActivity
-                parentActivity={activity}
-                onSubmit={(payload) => onSubmitForm(payload, null)}
-                onCancel={onCancelForm}
-              />
-            </div>
-          )}
-
-          {hasChildrenCost(activity) && (
-            <div className="mt-2 pl-6 text-xs text-text-muted inline-flex items-center gap-1">
-              <IconCoin size={11} />총{" "}
-              {calcActivityTotal(activity).toLocaleString()}원
-            </div>
-          )}
-        </div>
+      {/* ─── 갤러리 오버레이 ─── */}
+      {galleryOpenAt !== null && photos.length > 0 && (
+        <PhotoGallery
+          photos={photos}
+          urlMap={urlMap}
+          startIndex={galleryOpenAt}
+          onClose={() => setGalleryOpenAt(null)}
+        />
       )}
-
-      {/* ─── + 세부 일정 추가 (항상 표시) ─────────────── */}
-      {!isAddingSubToThis && (
-        <button
-          type="button"
-          onClick={() => onStartAddSub(activity.id)}
-          className="mt-2 ml-6 text-xs text-text-muted hover:text-text inline-flex items-center gap-1 transition-colors"
-        >
-          <IconPlus size={12} />
-          세부 일정 추가
-        </button>
-      )}
-    </div>
+    </>
   );
 }
 

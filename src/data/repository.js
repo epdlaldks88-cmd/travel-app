@@ -1,4 +1,11 @@
+// 파일 최상단
 import { db } from "./db";
+import { resizeImage } from "../lib/imageResize";
+import {
+  buildActivityPhotoPath,
+  uploadPhoto,
+  deletePhoto as storageDeletePhoto,
+} from "../lib/photoStorage";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -377,4 +384,117 @@ export async function updateProfile(userId, patch) {
   await db.profile.put(updated);
   await enqueue("profiles", "update", userId, updated);
   return updated;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Activity Photos (v3 신규)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 액티비티의 사진 목록 (정렬 순서 기준).
+ */
+export async function listActivityPhotos(activityId) {
+  const rows = await db.activity_photos
+    .where("activityId")
+    .equals(activityId)
+    .toArray();
+  return rows.sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      (a.createdAt || "").localeCompare(b.createdAt || ""),
+  );
+}
+
+/**
+ * 사진 추가 흐름:
+ *   1. 로컬에서 리사이즈 (긴 변 3840px, JPEG 90%)
+ *   2. Supabase Storage 업로드
+ *   3. 메타 정보를 activity_photos 테이블에 저장
+ *   4. 실패 시: Storage 롤백 (업로드된 파일 삭제)
+ *
+ * @param {string} activityId
+ * @param {string} ownerId
+ * @param {File} file
+ * @param {number} sortOrder
+ */
+export async function addActivityPhoto(
+  activityId,
+  ownerId,
+  file,
+  sortOrder = 0,
+) {
+  // 1. 리사이즈
+  const resized = await resizeImage(file);
+
+  // 2. 업로드 준비
+  const photoId = newId();
+  const storagePath = buildActivityPhotoPath(ownerId, activityId, photoId);
+
+  // 3. Storage 업로드
+  await uploadPhoto(storagePath, resized.blob);
+
+  // 4. 메타 저장 (Dexie + sync_queue)
+  const timestamp = now();
+  const entity = normalizeForSync({
+    id: photoId,
+    activityId,
+    ownerId,
+    storagePath,
+    width: resized.width,
+    height: resized.height,
+    sizeBytes: resized.sizeBytes,
+    takenAt: resized.takenAt,
+    sortOrder,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  try {
+    await db.activity_photos.add(entity);
+    await enqueue("activity_photos", "insert", entity.id, entity);
+  } catch (err) {
+    // 로컬 저장 실패 시 Storage 롤백
+    try {
+      await storageDeletePhoto(storagePath);
+    } catch (_) {}
+    throw err;
+  }
+
+  return entity;
+}
+
+/**
+ * 사진 삭제:
+ *   1. Storage에서 파일 삭제
+ *   2. 로컬 + sync_queue 등록
+ */
+export async function deleteActivityPhoto(id) {
+  const entity = await db.activity_photos.get(id);
+  if (!entity) return;
+
+  // Storage 파일 삭제 (실패해도 진행: 로컬/서버 메타는 지움)
+  try {
+    await storageDeletePhoto(entity.storagePath);
+  } catch (err) {
+    console.warn("[photo] Storage 삭제 실패, 메타는 계속 진행:", err);
+  }
+
+  await db.activity_photos.delete(id);
+  await enqueue("activity_photos", "delete", id, null);
+}
+
+/**
+ * 사진 순서 변경 (드래그앤드롭 등에서 호출).
+ */
+export async function updateActivityPhotoOrder(id, sortOrder) {
+  const timestamp = now();
+  await db.activity_photos.update(id, {
+    sortOrder,
+    updatedAt: timestamp,
+  });
+  const entity = await db.activity_photos.get(id);
+  if (entity) {
+    await enqueue("activity_photos", "update", id, normalizeForSync(entity));
+  }
+  return entity;
 }

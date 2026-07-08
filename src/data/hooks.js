@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "./db";
-import * as repository from "./repository";
+import {
+  addActivityPhoto,
+  deleteActivityPhoto,
+  updateActivityPhotoOrder,
+  listActivityPhotos,
+} from "./repository";
+import { getSignedUrls } from "../lib/photoStorage";
 import { useAuth } from "../lib/useAuth";
 import { triggerFlush, syncWorker } from "./sync";
 
@@ -271,4 +277,113 @@ export function useSyncStatus() {
   }, []);
 
   return { pending, online, isFlushing };
+}
+
+/**
+ * 액티비티 사진 목록 (Dexie live).
+ */
+export function useActivityPhotos(activityId) {
+  return useLiveQuery(
+    () => (activityId ? listActivityPhotos(activityId) : []),
+    [activityId],
+    [],
+  );
+}
+
+/**
+ * 사진 메타 리스트를 받아 signed URL 매핑을 캐시.
+ * { [storagePath]: url } 반환.
+ * 만료 5분 전에 자동 재발급.
+ */
+const urlCache = new Map(); // path -> { url, expiresAt }
+const URL_TTL_MS = 3600 * 1000; // 1시간
+const RENEW_BEFORE_MS = 5 * 60 * 1000; // 만료 5분 전
+
+export function usePhotoUrls(photos) {
+  const [urlMap, setUrlMap] = useState({});
+
+  useEffect(() => {
+    if (!photos || photos.length === 0) {
+      setUrlMap({});
+      return;
+    }
+
+    let cancelled = false;
+    const now = Date.now();
+
+    // 캐시에서 아직 유효한 것 걸러내기
+    const validCached = {};
+    const needsFetch = [];
+    for (const photo of photos) {
+      const cached = urlCache.get(photo.storagePath);
+      if (cached && cached.expiresAt - now > RENEW_BEFORE_MS) {
+        validCached[photo.storagePath] = cached.url;
+      } else {
+        needsFetch.push(photo.storagePath);
+      }
+    }
+
+    if (needsFetch.length === 0) {
+      setUrlMap(validCached);
+      return;
+    }
+
+    // 필요한 것만 새로 발급
+    getSignedUrls(needsFetch)
+      .then((fresh) => {
+        if (cancelled) return;
+        const expiresAt = Date.now() + URL_TTL_MS;
+        for (const [path, url] of Object.entries(fresh)) {
+          if (url) urlCache.set(path, { url, expiresAt });
+        }
+        setUrlMap({ ...validCached, ...fresh });
+      })
+      .catch((err) => {
+        console.error("[photo] signed URL 발급 실패:", err);
+        setUrlMap(validCached);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [photos]);
+
+  return urlMap;
+}
+
+/**
+ * 사진 추가 (리사이즈 + 업로드 + 메타 저장).
+ * File 하나씩 처리. 여러 장이면 반복 호출.
+ */
+export function useAddActivityPhoto() {
+  const { user } = useAuth();
+  return useCallback(
+    async (activityId, file, sortOrder = 0) => {
+      if (!user) throw new Error("로그인이 필요합니다");
+      const entity = await addActivityPhoto(
+        activityId,
+        user.id,
+        file,
+        sortOrder,
+      );
+      triggerFlush();
+      return entity;
+    },
+    [user],
+  );
+}
+
+export function useDeleteActivityPhoto() {
+  return useCallback(async (id) => {
+    await deleteActivityPhoto(id);
+    triggerFlush();
+  }, []);
+}
+
+export function useUpdateActivityPhotoOrder() {
+  return useCallback(async (id, sortOrder) => {
+    const entity = await updateActivityPhotoOrder(id, sortOrder);
+    triggerFlush();
+    return entity;
+  }, []);
 }

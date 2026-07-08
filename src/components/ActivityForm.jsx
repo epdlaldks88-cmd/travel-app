@@ -20,7 +20,14 @@ import {
 import { CUISINES, FOOD_TYPES, MEAL_TYPES } from "../data/foods";
 import { Button, Card, Chip, Input, Textarea, Label, Rating } from "./ui";
 import PlaceSearchModal from "./PlaceSearchModal";
-import { useProfile, useAccommodations } from "../data/hooks";
+import {
+  useProfile,
+  useAccommodations,
+  useActivityPhotos,
+  usePhotoUrls,
+} from "../data/hooks";
+import PhotoUploader from "./PhotoUploader";
+import PhotoGallery from "./PhotoGallery";
 
 /**
  * 부모 활동 카테고리 5개
@@ -136,6 +143,11 @@ function ActivityForm({
   const [showPlaceSearch, setShowPlaceSearch] = useState(false);
   const [gpsLat, setGpsLat] = useState(initialData?.gpsLat ?? null);
   const [gpsLng, setGpsLng] = useState(initialData?.gpsLng ?? null);
+
+  // 사진 갤러리 열기 상태 (편집 모드 전용)
+  const [galleryOpenAt, setGalleryOpenAt] = useState(null);
+  const photos = useActivityPhotos(isEditing ? initialData?.id : null) || [];
+  const urlMap = usePhotoUrls(photos);
 
   /* ─── type별 라벨/placeholder ─────────────────────────── */
   const getNameLabel = () => {
@@ -736,6 +748,16 @@ function ActivityForm({
             <Rating value={rating} onChange={setRating} size="lg" />
           </div>
 
+          {/* ============ 사진 (편집 모드 · 부모만) ============ */}
+          {isEditing && !isSubActivity && initialData?.id && (
+            <div className="pt-2 border-t border-border">
+              <PhotoUploader
+                activityId={initialData.id}
+                onOpenGallery={(idx) => setGalleryOpenAt(idx)}
+              />
+            </div>
+          )}
+
           {/* ============ 메모 ============ */}
           <div>
             <Label>메모</Label>
@@ -768,6 +790,14 @@ function ActivityForm({
           initialKeyword={name}
           onSelect={handlePlaceSelect}
           onClose={() => setShowPlaceSearch(false)}
+        />
+      )}
+      {galleryOpenAt !== null && photos.length > 0 && (
+        <PhotoGallery
+          photos={photos}
+          urlMap={urlMap}
+          startIndex={galleryOpenAt}
+          onClose={() => setGalleryOpenAt(null)}
         />
       )}
     </>

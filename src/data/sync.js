@@ -157,6 +157,19 @@ class SyncWorker {
       const accommodationEntities = (accommodations || []).map(fromSupabase);
       const profileEntity = profile ? fromSupabase(profile) : null;
 
+      // 액티비티 사진 (v3 신규)
+      const activityIds = activityEntities.map((a) => a.id);
+      const { data: activityPhotos, error: photosErr } =
+        activityIds.length > 0
+          ? await supabase
+              .from("activity_photos")
+              .select("*")
+              .in("activity_id", activityIds)
+          : { data: [], error: null };
+      if (photosErr) throw photosErr;
+
+      const activityPhotoEntities = (activityPhotos || []).map(fromSupabase);
+
       await db.transaction(
         "rw",
         db.trips,
@@ -164,6 +177,7 @@ class SyncWorker {
         db.day_notes,
         db.accommodations,
         db.profile,
+        db.activity_photos,
         db.meta,
         async () => {
           // ⭐ clear 대신 bulkPut (upsert)
@@ -171,6 +185,7 @@ class SyncWorker {
           await db.activities.bulkPut(activityEntities);
           await db.day_notes.bulkPut(dayNoteEntities);
           await db.accommodations.bulkPut(accommodationEntities);
+          await db.activity_photos.bulkPut(activityPhotoEntities);
           if (profileEntity) {
             await db.profile.put(profileEntity);
           }

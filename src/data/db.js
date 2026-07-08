@@ -7,14 +7,14 @@ import Dexie from "dexie";
  *   trips              - 여행 (오프라인 캐시)
  *   activities         - 일정 (오프라인 캐시)
  *   day_notes          - 일별 감상 (오프라인 캐시)
- *   accommodations     - 여행별 숙소 정보 (v2 신규)
- *   profile            - 유저 프로필 캐시 (v2 신규, id=userId)
+ *   accommodations     - 여행별 숙소 정보 (v2)
+ *   profile            - 유저 프로필 캐시 (v2)
+ *   activity_photos    - 액티비티 사진 메타 (v3 신규, 파일은 Storage)
  *   sync_queue         - 서버로 전송 대기 중인 변경 (오프라인 큐)
  *   meta               - 앱 메타 (마지막 sync 시각 등)
  *
  * 인덱스 규칙:
  *   Dexie 는 boolean 값을 인덱스로 못 씀 (is_favorite 등은 in-memory 필터).
- *   [tripId+date] 는 복합 인덱스 (day_notes 조회용).
  *
  * 데이터 형식은 camelCase (Supabase snake_case ↔ mappers.js 로 변환).
  */
@@ -31,13 +31,24 @@ class TravelDB extends Dexie {
       meta: "key",
     });
 
-    // ⭐ v2: 숙소 + 프로필 스토어 추가, activities에 accommodationId 인덱스
     this.version(2).stores({
       trips: "id, ownerId, startDate, updatedAt",
       activities: "id, tripId, date, accommodationId, updatedAt",
       day_notes: "id, tripId, [tripId+date], updatedAt",
       accommodations: "id, tripId, ownerId, updatedAt",
       profile: "id",
+      sync_queue: "++id, table, entityId, createdAt",
+      meta: "key",
+    });
+
+    // ⭐ v3: 액티비티 사진 스토어 추가
+    this.version(3).stores({
+      trips: "id, ownerId, startDate, updatedAt",
+      activities: "id, tripId, date, accommodationId, updatedAt",
+      day_notes: "id, tripId, [tripId+date], updatedAt",
+      accommodations: "id, tripId, ownerId, updatedAt",
+      profile: "id",
+      activity_photos: "id, activityId, ownerId, sortOrder, updatedAt",
       sync_queue: "++id, table, entityId, createdAt",
       meta: "key",
     });
@@ -57,6 +68,7 @@ export async function clearLocalData() {
     db.day_notes,
     db.accommodations,
     db.profile,
+    db.activity_photos,
     db.sync_queue,
     db.meta,
     async () => {
@@ -65,6 +77,7 @@ export async function clearLocalData() {
       await db.day_notes.clear();
       await db.accommodations.clear();
       await db.profile.clear();
+      await db.activity_photos.clear();
       await db.sync_queue.clear();
       await db.meta.clear();
     },
