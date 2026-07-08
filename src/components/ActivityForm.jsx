@@ -22,14 +22,6 @@ import {
 import { CUISINES, FOOD_TYPES, MEAL_TYPES } from "../data/foods";
 import { Button, Card, Chip, Input, Textarea, Label, Rating } from "./ui";
 import PlaceSearchModal from "./PlaceSearchModal";
-import { useProfile, useAccommodations } from "../data/hooks";
-import { useToast } from "./Toast";
-import {
-  getDirections,
-  getPriorityForTransport,
-  secondsToHM,
-  metersToKm,
-} from "../lib/kakaoDirections";
 import PhotoUploader from "./PhotoUploader";
 import PhotoGallery from "./PhotoGallery";
 import {
@@ -38,6 +30,13 @@ import {
   useActivityPhotos,
   usePhotoUrls,
 } from "../data/hooks";
+import { useToast } from "./Toast";
+import {
+  getDirections,
+  getPriorityForTransport,
+  secondsToHM,
+  metersToKm,
+} from "../lib/kakaoDirections";
 
 const ACTIVITY_TYPES = [
   { value: "관광지", icon: IconMapPin },
