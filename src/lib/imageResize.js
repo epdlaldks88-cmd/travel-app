@@ -3,14 +3,14 @@
  * File → Canvas 리사이즈 → JPEG Blob 반환.
  *
  * 정책:
- *   - 긴 변 3840px 이하로 다운스케일 (원본보다 작지 않게)
+ *   - 긴 변 1920px 이하로 다운스케일 (원본보다 작지 않게)
  *   - JPEG 품질 0.9
  *   - EXIF 촬영 시각 추출 (있으면)
  *
  * 결과 파일이 3MB 넘으면 품질을 낮춰 재시도.
  */
 
-const MAX_LONG_SIDE = 3840;
+const MAX_LONG_SIDE = 1920;
 const DEFAULT_QUALITY = 0.9;
 const MIN_QUALITY = 0.6;
 const MAX_BYTES = 3 * 1024 * 1024; // 3MB
@@ -65,7 +65,6 @@ export async function resizeImage(file) {
 
 async function canvasToBlob(canvas, quality) {
   if (canvas.convertToBlob) {
-    // OffscreenCanvas
     return canvas.convertToBlob({ type: "image/jpeg", quality });
   }
   return new Promise((resolve, reject) => {
@@ -79,20 +78,17 @@ async function canvasToBlob(canvas, quality) {
 
 /**
  * 간이 EXIF DateTimeOriginal 파서.
- * JPEG APP1 세그먼트만 확인. 실패 시 null.
  */
 async function extractExifDate(file) {
   const buf = await file.slice(0, 128 * 1024).arrayBuffer();
   const view = new DataView(buf);
 
-  // JPEG SOI 확인
   if (view.getUint16(0) !== 0xffd8) return null;
 
   let offset = 2;
   while (offset < view.byteLength) {
     const marker = view.getUint16(offset);
     if (marker === 0xffe1) {
-      // APP1 (EXIF)
       const size = view.getUint16(offset + 2);
       const exifHeader = String.fromCharCode(
         view.getUint8(offset + 4),
@@ -141,14 +137,13 @@ function parseExif(view, tiffStart, length) {
     const entry = exifIfdPtr + 2 + i * 12;
     const tag = get16(entry);
     if (tag === 0x9003) {
-      // DateTimeOriginal
       const valOffset = get32(entry + 8);
       const strStart = tiffStart + valOffset;
       const chars = [];
       for (let j = 0; j < 19; j++) {
         chars.push(String.fromCharCode(view.getUint8(strStart + j)));
       }
-      const str = chars.join(""); // "2026:09:06 12:34:56"
+      const str = chars.join("");
       const m = str.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
       if (m) {
         return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`;

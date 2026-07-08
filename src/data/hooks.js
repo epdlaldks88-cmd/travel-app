@@ -300,36 +300,61 @@ const urlCache = new Map(); // path -> { url, expiresAt }
 const URL_TTL_MS = 3600 * 1000; // 1시간
 const RENEW_BEFORE_MS = 5 * 60 * 1000; // 만료 5분 전
 
+/**
+ * 사진 메타 리스트를 받아 signed URL 매핑을 캐시.
+ * { [storagePath]: url } 반환.
+ * 만료 5분 전에 자동 재발급.
+ *
+ * 최적화:
+ *   - photos 배열 참조 대신 storagePath 문자열을 dependency로 사용
+ *     (Dexie useLiveQuery는 매번 새 배열 반환 → 참조 비교로는 계속 재실행)
+ *   - 캐시 히트만 있으면 setUrlMap 호출 스킵 (불필요한 리렌더 방지)
+ */
 export function usePhotoUrls(photos) {
   const [urlMap, setUrlMap] = useState({});
 
+  // ⭐ 안정적인 dependency: photos 배열 대신 storagePath 문자열
+  const pathsKey = photos?.map((p) => p.storagePath).join("|") ?? "";
+
   useEffect(() => {
     if (!photos || photos.length === 0) {
-      setUrlMap({});
+      setUrlMap((prev) => (Object.keys(prev).length === 0 ? prev : {}));
       return;
     }
 
     let cancelled = false;
-    const now = Date.now();
+    const nowMs = Date.now();
 
     // 캐시에서 아직 유효한 것 걸러내기
     const validCached = {};
     const needsFetch = [];
     for (const photo of photos) {
       const cached = urlCache.get(photo.storagePath);
-      if (cached && cached.expiresAt - now > RENEW_BEFORE_MS) {
+      if (cached && cached.expiresAt - nowMs > RENEW_BEFORE_MS) {
         validCached[photo.storagePath] = cached.url;
       } else {
         needsFetch.push(photo.storagePath);
       }
     }
 
+    // 새로 발급할 게 없으면 캐시만 반영
     if (needsFetch.length === 0) {
-      setUrlMap(validCached);
+      // 이미 같은 상태면 스킵 (리렌더 방지)
+      setUrlMap((prev) => {
+        const sameSize =
+          Object.keys(prev).length === Object.keys(validCached).length;
+        if (sameSize) {
+          const sameKeys = Object.keys(validCached).every(
+            (k) => prev[k] === validCached[k],
+          );
+          if (sameKeys) return prev;
+        }
+        return validCached;
+      });
       return;
     }
 
-    // 필요한 것만 새로 발급
+    // 새 것만 발급
     getSignedUrls(needsFetch)
       .then((fresh) => {
         if (cancelled) return;
@@ -341,13 +366,14 @@ export function usePhotoUrls(photos) {
       })
       .catch((err) => {
         console.error("[photo] signed URL 발급 실패:", err);
-        setUrlMap(validCached);
+        if (!cancelled) setUrlMap(validCached);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [photos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathsKey]);
 
   return urlMap;
 }

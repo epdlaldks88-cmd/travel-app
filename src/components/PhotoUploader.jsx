@@ -17,9 +17,11 @@ import {
 import { useToast } from "./Toast";
 
 const MAX_PHOTOS = 50;
+const PARALLEL_LIMIT = 3; // 동시 업로드 최대치
 
 /**
  * 액티비티 편집 시 사진 업로드/삭제/대표 지정 섹션.
+ * 병렬 업로드로 대량 사진 추가 시간 단축.
  */
 function PhotoUploader({ activityId, onOpenGallery }) {
   const photos = useActivityPhotos(activityId);
@@ -36,9 +38,42 @@ function PhotoUploader({ activityId, onOpenGallery }) {
 
   const currentCount = photos?.length ?? 0;
   const remaining = MAX_PHOTOS - currentCount;
-
-  // 첫 번째 사진 = 대표 (sortOrder 오름차순 정렬 기준)
   const coverId = photos?.[0]?.id;
+
+  /**
+   * 여러 파일을 병렬로 업로드하되 동시 실행 개수를 PARALLEL_LIMIT으로 제한.
+   * 리사이즈 + 업로드 + 메타 저장이 addPhoto 안에서 다 처리됨.
+   */
+  const uploadInBatches = async (files, baseSortOrder) => {
+    let doneCount = 0;
+    const failedFiles = [];
+
+    // files를 PARALLEL_LIMIT 크기의 그룹으로 나눠 처리
+    for (let i = 0; i < files.length; i += PARALLEL_LIMIT) {
+      const batch = files.slice(i, i + PARALLEL_LIMIT);
+      const results = await Promise.allSettled(
+        batch.map((file, idx) =>
+          addPhoto(activityId, file, baseSortOrder + i + idx),
+        ),
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        if (result.status === "fulfilled") {
+          doneCount++;
+        } else {
+          console.error(
+            `[photo] 업로드 실패 (${batch[j].name}):`,
+            result.reason,
+          );
+          failedFiles.push(batch[j].name);
+        }
+        setProgress((prev) => ({ ...prev, done: prev.done + 1 }));
+      }
+    }
+
+    return { doneCount, failedFiles };
+  };
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -56,26 +91,16 @@ function PhotoUploader({ activityId, onOpenGallery }) {
     setUploading(true);
     setProgress({ done: 0, total: files.length });
 
-    let successCount = 0;
-    const failedFiles = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        await addPhoto(activityId, file, currentCount + i);
-        successCount++;
-      } catch (err) {
-        console.error(`[photo] 업로드 실패 (${file.name}):`, err);
-        failedFiles.push(file.name);
-      }
-      setProgress({ done: i + 1, total: files.length });
-    }
+    const { doneCount, failedFiles } = await uploadInBatches(
+      files,
+      currentCount,
+    );
 
     setUploading(false);
     setProgress({ done: 0, total: 0 });
 
-    if (successCount > 0) {
-      toast.success(`사진 ${successCount}장 업로드 완료`);
+    if (doneCount > 0) {
+      toast.success(`사진 ${doneCount}장 업로드 완료`);
     }
     if (failedFiles.length > 0) {
       toast.error(`${failedFiles.length}장 업로드 실패`);
@@ -93,12 +118,8 @@ function PhotoUploader({ activityId, onOpenGallery }) {
     }
   };
 
-  /**
-   * 대표로 지정: 이 사진의 sortOrder를 (최소값 - 1)로 만들어 맨 앞으로.
-   * 다른 사진들은 그대로 유지 (상대 순서 보존).
-   */
   const handleSetCover = async (photo) => {
-    if (photo.id === coverId) return; // 이미 대표
+    if (photo.id === coverId) return;
     try {
       const minSort = Math.min(...photos.map((p) => p.sortOrder ?? 0));
       await updateOrder(photo.id, minSort - 1);
@@ -188,7 +209,6 @@ function PhotoUploader({ activityId, onOpenGallery }) {
                     </div>
                   )}
 
-                  {/* 대표 지정 버튼 (좌상단) */}
                   <button
                     type="button"
                     onClick={() => handleSetCover(photo)}
@@ -210,7 +230,6 @@ function PhotoUploader({ activityId, onOpenGallery }) {
                     )}
                   </button>
 
-                  {/* 삭제 버튼 (우상단) */}
                   <button
                     type="button"
                     onClick={() => handleDelete(photo)}
