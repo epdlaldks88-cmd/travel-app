@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { IconX, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import {
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
+  IconLoader2,
+} from "@tabler/icons-react";
 
 /**
  * 전체 화면 사진 뷰어.
  * - 좌우 화살표 / 스와이프 / 키보드로 이동
  * - ESC / 뒤로가기 / 배경 클릭으로 닫기
+ * - 인접 사진(앞뒤 1장) 프리로드로 넘김 속도 개선
  *
  * @param photos - [{ id, storagePath, ... }]
  * @param urlMap - { [storagePath]: signedUrl }
@@ -14,6 +20,7 @@ import { IconX, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 function PhotoGallery({ photos, urlMap, startIndex = 0, onClose }) {
   const [index, setIndex] = useState(startIndex);
   const [touchStart, setTouchStart] = useState(null);
+  const [loaded, setLoaded] = useState(new Set());
 
   const total = photos.length;
 
@@ -48,7 +55,6 @@ function PhotoGallery({ photos, urlMap, startIndex = 0, onClose }) {
   }, [onClose]);
 
   const handleClose = () => {
-    // pushState 한 것 되돌리기
     if (window.history.state?.photoGallery) {
       window.history.back();
     } else {
@@ -64,6 +70,31 @@ function PhotoGallery({ photos, urlMap, startIndex = 0, onClose }) {
       document.body.style.overflow = original;
     };
   }, []);
+
+  // ⭐ 인접 이미지 프리로드 (현재 + 앞뒤 각 1장)
+  useEffect(() => {
+    const targetIndices = [
+      index,
+      (index - 1 + total) % total,
+      (index + 1) % total,
+    ];
+    for (const i of targetIndices) {
+      const photo = photos[i];
+      const url = photo && urlMap[photo.storagePath];
+      if (!url || loaded.has(photo.storagePath)) continue;
+
+      const img = new Image();
+      img.onload = () => {
+        setLoaded((prev) => {
+          if (prev.has(photo.storagePath)) return prev;
+          const next = new Set(prev);
+          next.add(photo.storagePath);
+          return next;
+        });
+      };
+      img.src = url;
+    }
+  }, [index, photos, urlMap, total, loaded]);
 
   // 터치 스와이프
   const handleTouchStart = (e) => {
@@ -83,18 +114,18 @@ function PhotoGallery({ photos, urlMap, startIndex = 0, onClose }) {
 
   const currentPhoto = photos[index];
   const currentUrl = urlMap[currentPhoto?.storagePath];
+  const isCurrentLoaded = currentPhoto && loaded.has(currentPhoto.storagePath);
 
   return (
     <div
       className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
       onClick={(e) => {
-        // 배경 클릭 시 닫기 (사진 자체 클릭은 제외)
         if (e.target === e.currentTarget) handleClose();
       }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* 닫기 버튼 */}
+      {/* 닫기 */}
       <button
         type="button"
         onClick={handleClose}
@@ -111,7 +142,7 @@ function PhotoGallery({ photos, urlMap, startIndex = 0, onClose }) {
         </div>
       )}
 
-      {/* 이전 버튼 */}
+      {/* 이전 */}
       {total > 1 && (
         <button
           type="button"
@@ -123,19 +154,35 @@ function PhotoGallery({ photos, urlMap, startIndex = 0, onClose }) {
         </button>
       )}
 
-      {/* 이미지 */}
-      {currentUrl ? (
-        <img
-          src={currentUrl}
-          alt=""
-          className="max-w-full max-h-full object-contain select-none"
-          draggable={false}
-        />
-      ) : (
-        <div className="text-white text-sm">불러오는 중...</div>
-      )}
+      {/* 이미지 + 로딩 스피너 */}
+      <div className="relative flex items-center justify-center max-w-full max-h-full">
+        {currentUrl && (
+          <img
+            key={currentPhoto.storagePath}
+            src={currentUrl}
+            alt=""
+            className={`max-w-full max-h-full object-contain select-none transition-opacity duration-150 ${
+              isCurrentLoaded ? "opacity-100" : "opacity-0"
+            }`}
+            draggable={false}
+            onLoad={() =>
+              setLoaded((prev) => {
+                if (prev.has(currentPhoto.storagePath)) return prev;
+                const next = new Set(prev);
+                next.add(currentPhoto.storagePath);
+                return next;
+              })
+            }
+          />
+        )}
+        {(!currentUrl || !isCurrentLoaded) && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <IconLoader2 size={32} className="animate-spin text-white/70" />
+          </div>
+        )}
+      </div>
 
-      {/* 다음 버튼 */}
+      {/* 다음 */}
       {total > 1 && (
         <button
           type="button"
