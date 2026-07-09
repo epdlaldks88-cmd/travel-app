@@ -220,6 +220,14 @@ export async function createSubActivity(parentId, data) {
     memo: data.memo || "",
     rating: data.rating ?? null,
     name: data.name || "",
+    location: data.location || "",
+    gpsLat: data.gpsLat ?? null,
+    gpsLng: data.gpsLng ?? null,
+    // 식당 정보 (type === "식당"일 때만 채워짐)
+    mealType: data.mealType || "",
+    cuisines: data.cuisines || [],
+    foodTypes: data.foodTypes || [],
+    foodDetails: data.foodDetails || "",
     createdAt: timestamp,
     updatedAt: timestamp,
   });

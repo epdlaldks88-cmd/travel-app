@@ -414,3 +414,39 @@ export function useUpdateActivityPhotoOrder() {
     return entity;
   }, []);
 }
+
+/**
+ * 사용자의 모든 즐겨찾기 액티비티 (모든 여행 통합).
+ * 부모 + 자식 모두 포함. isFavorite=true인 것만.
+ */
+export function useFavoriteActivities() {
+  const { user } = useAuth();
+  return useLiveQuery(
+    async () => {
+      if (!user) return [];
+
+      // 사용자의 모든 여행
+      const trips = await db.trips.where("ownerId").equals(user.id).toArray();
+      const tripMap = new Map(trips.map((t) => [t.id, t]));
+      const tripIds = trips.map((t) => t.id);
+
+      if (tripIds.length === 0) return [];
+
+      // 사용자의 모든 액티비티 중 favorite=true
+      const activities = await db.activities
+        .where("tripId")
+        .anyOf(tripIds)
+        .toArray();
+
+      // isFavorite 필터 + trip 정보 붙임
+      return activities
+        .filter((a) => a.isFavorite)
+        .map((a) => ({
+          ...a,
+          trip: tripMap.get(a.tripId),
+        }));
+    },
+    [user?.id],
+    [],
+  );
+}

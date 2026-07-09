@@ -329,6 +329,9 @@ function ActivityForm({
       let subPayload = {
         type,
         name,
+        location,
+        gpsLat,
+        gpsLng,
         time,
         cost: cost ? Number(cost) : 0,
         memo,
@@ -515,11 +518,24 @@ function ActivityForm({
                 )}
               </div>
             ) : (
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={getNamePlaceholder()}
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={getNamePlaceholder()}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPlaceSearch(true)}
+                  aria-label="장소 검색"
+                  title="카카오 지도에서 검색"
+                  className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-surface-alt text-text-muted hover:text-text hover:bg-surface border border-border transition-colors"
+                >
+                  <IconLocationSearch size={18} />
+                </button>
+              </div>
             )}
           </div>
 

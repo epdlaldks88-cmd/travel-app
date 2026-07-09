@@ -18,13 +18,19 @@ import {
   IconCoffee,
   IconShoppingBag,
   IconPhoto,
+  IconStar,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import { useState } from "react";
 import { Rating } from "./ui";
 import ActivityForm from "./ActivityForm";
 import PhotoGallery from "./PhotoGallery";
 import { calcActivityTotal, hasChildrenCost } from "../data/calc";
-import { useActivityPhotos, usePhotoUrls } from "../data/hooks";
+import {
+  useActivityPhotos,
+  usePhotoUrls,
+  useUpdateActivity,
+} from "../data/hooks";
 
 const TYPE_ICONS = {
   관광지: IconMapPin,
@@ -53,6 +59,16 @@ const TRANSPORT_ICONS = {
   렌트카: IconSteeringWheel,
   기타: IconRoute,
 };
+
+// 즐겨찾기 가능한 카테고리
+const FAVORABLE_TYPES = new Set([
+  "관광지",
+  "식당",
+  "관광",
+  "카페",
+  "쇼핑",
+  "기타",
+]);
 
 function formatDuration(hours, minutes) {
   const h = Number(hours) || 0;
@@ -90,8 +106,9 @@ function MiniBadge({ variant = "default", children }) {
 /**
  * 자식 활동 카드 (한 줄 컴팩트 카드)
  */
-function SubActivityItem({ sub, onEdit, onDelete }) {
+function SubActivityItem({ sub, onEdit, onDelete, onToggleFavorite }) {
   const Icon = SUB_TYPE_ICONS[sub.type] || IconBookmark;
+  const canFavorite = FAVORABLE_TYPES.has(sub.type);
   return (
     <div className="flex items-center gap-2 pl-6 py-1.5">
       <div className="w-5 h-5 rounded flex items-center justify-center bg-surface-alt text-text-muted shrink-0">
@@ -106,6 +123,24 @@ function SubActivityItem({ sub, onEdit, onDelete }) {
         <span className="text-[11px] text-text-muted shrink-0">
           {sub.cost.toLocaleString()}원
         </span>
+      )}
+      {canFavorite && (
+        <button
+          type="button"
+          onClick={() => onToggleFavorite(sub)}
+          aria-label={sub.isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}
+          className={`p-1 rounded-full transition-colors shrink-0 ${
+            sub.isFavorite
+              ? "text-accent hover:bg-surface-alt"
+              : "text-text-subtle hover:text-text hover:bg-surface-alt"
+          }`}
+        >
+          {sub.isFavorite ? (
+            <IconStarFilled size={12} />
+          ) : (
+            <IconStar size={12} />
+          )}
+        </button>
       )}
       <button
         type="button"
@@ -139,12 +174,15 @@ function ActivityItem({
   tripId,
   tripStartDate,
   tripEndDate,
+  previousActivity,
   previousActivityName,
 }) {
   const Icon = TYPE_ICONS[activity.type] || IconBookmark;
   const TransportIcon = activity.transport
     ? TRANSPORT_ICONS[activity.transport]
     : null;
+
+  const updateActivity = useUpdateActivity();
 
   const duration = formatDuration(
     activity.durationHours,
@@ -168,7 +206,7 @@ function ActivityItem({
   const isEditingThisParent = editingId === activity.id;
   const isAddingSubToThis = subFormParentId === activity.id;
 
-  // ⭐ 사진 (부모 액티비티만, 편집 모드 아닐 때만 조회)
+  // 사진 (부모 액티비티만, 편집 모드 아닐 때만 조회)
   const isParent = !activity.parentActivityId;
   const photos =
     useActivityPhotos(isParent && !isEditingThisParent ? activity.id : null) ||
@@ -177,10 +215,14 @@ function ActivityItem({
   const firstPhoto = photos[0];
   const firstPhotoUrl = firstPhoto ? urlMap[firstPhoto.storagePath] : null;
 
-  // 갤러리 열기 상태
   const [galleryOpenAt, setGalleryOpenAt] = useState(null);
 
-  // 부모 편집 중이면 카드 전체를 폼으로 대체 (자식들도 안 보임)
+  // 즐겨찾기 토글
+  const canFavorite = FAVORABLE_TYPES.has(activity.type);
+  const handleToggleFavorite = async (target) => {
+    await updateActivity(target.id, { isFavorite: !target.isFavorite });
+  };
+
   if (isEditingThisParent) {
     return (
       <ActivityForm
@@ -188,7 +230,7 @@ function ActivityItem({
         tripId={tripId}
         tripStartDate={tripStartDate}
         tripEndDate={tripEndDate}
-        previousActivity={null}
+        previousActivity={previousActivity ?? null}
         previousActivityName={previousActivityName}
         onSubmit={(payload) => onSubmitForm(payload, activity)}
         onCancel={onCancelForm}
@@ -199,7 +241,6 @@ function ActivityItem({
   return (
     <>
       <div className="bg-surface border border-border rounded-lg mb-2 relative overflow-hidden">
-        {/* ─── 상단 대표 사진 (있을 때만) ─── */}
         {firstPhotoUrl && (
           <button
             type="button"
@@ -222,10 +263,8 @@ function ActivityItem({
           </button>
         )}
 
-        {/* ─── 본문 ─── */}
         <div className="p-3">
           <div className="flex gap-3">
-            {/* ─── 좌측: 시간 · 타입 아이콘 ─── */}
             <div className="flex flex-col items-center gap-1 min-w-[42px]">
               {activity.time && (
                 <span className="text-[11px] text-text-muted">
@@ -237,7 +276,6 @@ function ActivityItem({
               </div>
             </div>
 
-            {/* ─── 중앙: 내용 ─── */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <MiniBadge>{activity.type}</MiniBadge>
@@ -344,8 +382,27 @@ function ActivityItem({
               )}
             </div>
 
-            {/* ─── 우측: 편집 · 삭제 ─── */}
             <div className="shrink-0 self-start flex flex-col gap-1">
+              {canFavorite && (
+                <button
+                  type="button"
+                  onClick={() => handleToggleFavorite(activity)}
+                  aria-label={
+                    activity.isFavorite ? "즐겨찾기 해제" : "즐겨찾기"
+                  }
+                  className={`p-1 rounded-full transition-colors ${
+                    activity.isFavorite
+                      ? "text-accent hover:bg-surface-alt"
+                      : "text-text-subtle hover:text-text hover:bg-surface-alt"
+                  }`}
+                >
+                  {activity.isFavorite ? (
+                    <IconStarFilled size={14} />
+                  ) : (
+                    <IconStar size={14} />
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onStartEdit(activity)}
@@ -365,7 +422,6 @@ function ActivityItem({
             </div>
           </div>
 
-          {/* ─── 자식 섹션 ─── */}
           {(children.length > 0 || isAddingSubToThis) && (
             <div className="mt-2 pt-2 border-t border-border">
               {children.map((sub) =>
@@ -385,6 +441,7 @@ function ActivityItem({
                     sub={sub}
                     onEdit={onStartEdit}
                     onDelete={onDelete}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 ),
               )}
@@ -410,7 +467,6 @@ function ActivityItem({
             </div>
           )}
 
-          {/* ─── + 세부 일정 추가 ─── */}
           {!isAddingSubToThis && (
             <button
               type="button"
@@ -424,7 +480,6 @@ function ActivityItem({
         </div>
       </div>
 
-      {/* ─── 갤러리 오버레이 ─── */}
       {galleryOpenAt !== null && photos.length > 0 && (
         <PhotoGallery
           photos={photos}
