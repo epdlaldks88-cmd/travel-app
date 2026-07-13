@@ -114,6 +114,17 @@ class SyncWorker {
     }
 
     try {
+      // 지난 pull 시각 (없으면 처음, 아주 오래 전으로 취급)
+      const lastPullMeta = await db.meta.get("lastPullAt");
+      const lastPullAt = lastPullMeta?.value || "1970-01-01T00:00:00Z";
+
+      // ⭐ Tombstone 조회 (지난 pull 이후 삭제된 것)
+      const { data: tombstones, error: tombstoneErr } = await supabase
+        .from("deletions")
+        .select("*")
+        .gt("deleted_at", lastPullAt);
+      if (tombstoneErr) throw tombstoneErr;
+
       // 프로필 (유저당 1개)
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
@@ -189,12 +200,50 @@ class SyncWorker {
           if (profileEntity) {
             await db.profile.put(profileEntity);
           }
+
+          // ⭐ Tombstone 적용: 다른 기기에서 삭제된 항목을 로컬에서도 제거
+          for (const tomb of tombstones || []) {
+            const tableName = tomb.table_name;
+            const entityId = tomb.entity_id;
+
+            if (tableName === "trips") {
+              await db.trips.delete(entityId);
+              // trips 삭제 시 관련 activities/accommodations/day_notes도 로컬 정리
+              await db.activities.where("tripId").equals(entityId).delete();
+              await db.accommodations.where("tripId").equals(entityId).delete();
+              await db.day_notes.where("tripId").equals(entityId).delete();
+            } else if (tableName === "activities") {
+              await db.activities.delete(entityId);
+              // 이 activity의 photos도 정리
+              await db.activity_photos
+                .where("activityId")
+                .equals(entityId)
+                .delete();
+            } else if (tableName === "trip_accommodations") {
+              await db.accommodations.delete(entityId);
+              // 이 숙소를 참조하는 activities.accommodationId를 null로
+              const refs = await db.activities
+                .where("accommodationId")
+                .equals(entityId)
+                .toArray();
+              for (const a of refs) {
+                await db.activities.put({ ...a, accommodationId: null });
+              }
+            } else if (tableName === "activity_photos") {
+              await db.activity_photos.delete(entityId);
+            }
+          }
+
           await db.meta.put({
             key: "lastPullAt",
             value: new Date().toISOString(),
           });
         },
       );
+
+      if (tombstones && tombstones.length > 0) {
+        console.log(`[sync] tombstone ${tombstones.length}개 적용`);
+      }
     } catch (err) {
       console.error("[sync] pull 실패:", err);
     }

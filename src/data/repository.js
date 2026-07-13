@@ -32,6 +32,28 @@ async function enqueue(table, operation, entityId, payload) {
 }
 
 /**
+ * Tombstone 기록. 삭제 시 deletions 테이블에 append.
+ * @param {string} tableName - "trips" | "activities" | "trip_accommodations" | "activity_photos"
+ * @param {string} entityId
+ * @param {string} ownerId
+ */
+async function enqueueTombstone(tableName, entityId, ownerId) {
+  await db.sync_queue.add({
+    table: "deletions",
+    operation: "insert",
+    entityId: newId(),
+    payload: {
+      tableName,
+      entityId,
+      ownerId,
+      deletedAt: now(),
+    },
+    createdAt: now(),
+    retries: 0,
+  });
+}
+
+/**
  * Postgres에서 빈 문자열을 허용하지 않는 컬럼들.
  * 이런 필드는 "" → null 로 정규화.
  *
@@ -130,6 +152,9 @@ export async function updateTrip(id, patch) {
 }
 
 export async function deleteTrip(id) {
+  const trip = await db.trips.get(id);
+  const ownerId = trip?.ownerId;
+
   await db.transaction(
     "rw",
     db.trips,
@@ -142,7 +167,11 @@ export async function deleteTrip(id) {
       await db.day_notes.where("tripId").equals(id).delete();
     },
   );
+
   await enqueue("trips", "delete", id, null);
+  if (ownerId) {
+    await enqueueTombstone("trips", id, ownerId);
+  }
 }
 
 /* ─── Activities ──────────────────────────────────────────── */
@@ -250,8 +279,15 @@ export async function updateActivity(id, patch) {
 }
 
 export async function deleteActivity(id) {
+  const activity = await db.activities.get(id);
+  const ownerId = activity?.ownerId;
+
   await db.activities.delete(id);
+
   await enqueue("activities", "delete", id, null);
+  if (ownerId) {
+    await enqueueTombstone("activities", id, ownerId);
+  }
 }
 
 /* ─── Day Notes ───────────────────────────────────────────── */
@@ -356,6 +392,9 @@ export async function updateAccommodation(id, patch) {
 }
 
 export async function deleteAccommodation(id) {
+  const acc = await db.accommodations.get(id);
+  const ownerId = acc?.ownerId;
+
   await db.transaction("rw", db.accommodations, db.activities, async () => {
     // 이 숙소를 참조하는 activities.accommodationId를 null로 (로컬 캐시 즉시 반영)
     // 서버는 ON DELETE SET NULL로 자동 처리
@@ -369,7 +408,11 @@ export async function deleteAccommodation(id) {
 
     await db.accommodations.delete(id);
   });
+
   await enqueue("trip_accommodations", "delete", id, null);
+  if (ownerId) {
+    await enqueueTombstone("trip_accommodations", id, ownerId);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -497,6 +540,10 @@ export async function deleteActivityPhoto(id) {
 
   await db.activity_photos.delete(id);
   await enqueue("activity_photos", "delete", id, null);
+
+  if (entity.ownerId) {
+    await enqueueTombstone("activity_photos", id, entity.ownerId);
+  }
 }
 
 /**
