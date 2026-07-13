@@ -36,6 +36,8 @@ import {
 } from "../data/hooks";
 import { calcTripTotal } from "../data/calc";
 import { useToast } from "../components/Toast";
+import { IconSparkles } from "@tabler/icons-react";
+import PromptGeneratorModal from "../components/PromptGeneratorModal";
 
 function TripDetailPage() {
   const { id } = useParams();
@@ -76,6 +78,8 @@ function TripDetailPage() {
   // ⭐ URL 쿼리로 폼 표시 제어 (FAB, 헤더 "추가" 버튼 공통)
   const [searchParams, setSearchParams] = useSearchParams();
   const showActivityForm = searchParams.get("new") === "1";
+
+  const [showPromptModal, setShowPromptModal] = useState(false);
 
   const toast = useToast();
 
@@ -299,14 +303,25 @@ function TripDetailPage() {
           >
             <IconArrowLeft size={18} />
           </button>
-          <button
-            type="button"
-            aria-label="사진 추가 (준비 중)"
-            title="사진 추가 (준비 중)"
-            className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
-          >
-            <IconCameraPlus size={18} />
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPromptModal(true)}
+              aria-label="AI 커버 프롬프트"
+              title="AI 커버 이미지 프롬프트 생성"
+              className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
+            >
+              <IconSparkles size={18} />
+            </button>
+            <button
+              type="button"
+              aria-label="사진 추가 (준비 중)"
+              title="사진 추가 (준비 중)"
+              className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
+            >
+              <IconCameraPlus size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="absolute bottom-4 left-4 right-4">
@@ -524,6 +539,14 @@ function TripDetailPage() {
           평점 · 메모 저장하기
         </Button>
       </div>
+
+      {showPromptModal && (
+        <PromptGeneratorModal
+          trip={trip}
+          activities={activities}
+          onClose={() => setShowPromptModal(false)}
+        />
+      )}
     </div>
   );
 }
