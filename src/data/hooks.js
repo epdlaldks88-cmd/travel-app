@@ -8,7 +8,7 @@ import {
   updateActivityPhotoOrder,
   listActivityPhotos,
 } from "./repository";
-import { getSignedUrls } from "../lib/photoStorage";
+import { getSignedUrl, getSignedUrls } from "../lib/photoStorage";
 import { useAuth } from "../lib/useAuth";
 import { triggerFlush, syncWorker } from "./sync";
 
@@ -449,4 +449,80 @@ export function useFavoriteActivities() {
     [user?.id],
     [],
   );
+}
+
+/**
+ * 여행 커버 이미지 signed URL 조회.
+ * coverStoragePath가 있으면 서명된 URL 반환, 없으면 null.
+ *
+ * TTL 캐시로 재발급 최소화.
+ */
+const coverUrlCache = new Map(); // path -> { url, expiresAt }
+const COVER_URL_TTL_MS = 3600 * 1000;
+const COVER_RENEW_BEFORE_MS = 5 * 60 * 1000;
+
+export function useCoverUrl(coverStoragePath) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    if (!coverStoragePath) {
+      setUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    const now = Date.now();
+
+    // 캐시 확인
+    const cached = coverUrlCache.get(coverStoragePath);
+    if (cached && cached.expiresAt - now > COVER_RENEW_BEFORE_MS) {
+      setUrl(cached.url);
+      return;
+    }
+
+    // 재발급
+    getSignedUrl(coverStoragePath, 3600)
+      .then((signedUrl) => {
+        if (cancelled) return;
+        coverUrlCache.set(coverStoragePath, {
+          url: signedUrl,
+          expiresAt: Date.now() + COVER_URL_TTL_MS,
+        });
+        setUrl(signedUrl);
+      })
+      .catch((err) => {
+        console.error("[cover] signed URL 발급 실패:", err);
+        if (!cancelled) setUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [coverStoragePath]);
+
+  return url;
+}
+
+/**
+ * 여행 커버 업로드/제거 훅.
+ */
+export function useUpdateTripCover() {
+  const { user } = useAuth();
+  return useCallback(
+    async (tripId, file) => {
+      if (!user) throw new Error("로그인이 필요합니다");
+      const entity = await repository.updateTripCover(tripId, user.id, file);
+      triggerFlush();
+      return entity;
+    },
+    [user],
+  );
+}
+
+export function useDeleteTripCover() {
+  return useCallback(async (tripId) => {
+    const entity = await repository.deleteTripCover(tripId);
+    triggerFlush();
+    return entity;
+  }, []);
 }

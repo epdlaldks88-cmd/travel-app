@@ -1,34 +1,36 @@
 /**
  * 이미지 리사이즈 유틸.
- * File → Canvas 리사이즈 → JPEG Blob 반환.
  *
  * 정책:
- *   - 긴 변 1920px 이하로 다운스케일 (원본보다 작지 않게)
- *   - JPEG 품질 0.9
- *   - EXIF 촬영 시각 추출 (있으면)
- *
- * 결과 파일이 3MB 넘으면 품질을 낮춰 재시도.
+ *   - 긴 변 maxLongSide 이하로 다운스케일 (원본보다 작지 않게)
+ *   - JPEG 품질 0.9 (3MB 넘으면 낮춤)
+ *   - EXIF 촬영 시각 추출
  */
 
-const MAX_LONG_SIDE = 1920;
+const DEFAULT_MAX_LONG_SIDE = 1920; // 액티비티 사진
+const COVER_MAX_LONG_SIDE = 2560; // 여행 커버 (큰 인포그래픽 대응)
 const DEFAULT_QUALITY = 0.9;
 const MIN_QUALITY = 0.6;
-const MAX_BYTES = 3 * 1024 * 1024; // 3MB
+const MAX_BYTES = 3 * 1024 * 1024;
+
+export { COVER_MAX_LONG_SIDE };
 
 /**
- * File → { blob, width, height, sizeBytes, takenAt }
+ * @param {File} file
+ * @param {object} [options]
+ * @param {number} [options.maxLongSide] - 리사이즈 상한 (기본 1920)
  */
-export async function resizeImage(file) {
+export async function resizeImage(file, options = {}) {
+  const maxLongSide = options.maxLongSide || DEFAULT_MAX_LONG_SIDE;
+
   const bitmap = await createImageBitmap(file);
   const { width: origW, height: origH } = bitmap;
 
-  // 리사이즈 대상 크기 계산
   const longSide = Math.max(origW, origH);
-  const scale = longSide > MAX_LONG_SIDE ? MAX_LONG_SIDE / longSide : 1;
+  const scale = longSide > maxLongSide ? maxLongSide / longSide : 1;
   const targetW = Math.round(origW * scale);
   const targetH = Math.round(origH * scale);
 
-  // Canvas에 그림
   const canvas =
     typeof OffscreenCanvas !== "undefined"
       ? new OffscreenCanvas(targetW, targetH)
@@ -40,7 +42,6 @@ export async function resizeImage(file) {
   ctx.drawImage(bitmap, 0, 0, targetW, targetH);
   bitmap.close?.();
 
-  // 품질 낮춰가며 3MB 이하로
   let quality = DEFAULT_QUALITY;
   let blob = await canvasToBlob(canvas, quality);
   while (blob.size > MAX_BYTES && quality > MIN_QUALITY) {
@@ -48,7 +49,6 @@ export async function resizeImage(file) {
     blob = await canvasToBlob(canvas, quality);
   }
 
-  // EXIF 촬영 시각 (실패해도 조용히)
   let takenAt = null;
   try {
     takenAt = await extractExifDate(file);
@@ -76,13 +76,11 @@ async function canvasToBlob(canvas, quality) {
   });
 }
 
-/**
- * 간이 EXIF DateTimeOriginal 파서.
- */
+/* ─── EXIF (기존과 동일) ─── */
+
 async function extractExifDate(file) {
   const buf = await file.slice(0, 128 * 1024).arrayBuffer();
   const view = new DataView(buf);
-
   if (view.getUint16(0) !== 0xffd8) return null;
 
   let offset = 2;
@@ -117,7 +115,6 @@ function parseExif(view, tiffStart, length) {
 
   if (get16(tiffStart + 2) !== 0x002a) return null;
   const ifd0Offset = get32(tiffStart + 4);
-
   const ifd0 = tiffStart + ifd0Offset;
   const numEntries = get16(ifd0);
 

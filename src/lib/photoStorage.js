@@ -60,3 +60,10 @@ export async function getSignedUrls(paths, expiresIn = 3600) {
   }
   return map;
 }
+
+/**
+ * 여행 커버 이미지 경로 규칙: {userId}/covers/{tripId}.jpg
+ */
+export function buildTripCoverPath(userId, tripId) {
+  return `${userId}/covers/${tripId}.jpg`;
+}

@@ -1,8 +1,9 @@
 // 파일 최상단
 import { db } from "./db";
-import { resizeImage } from "../lib/imageResize";
+import { resizeImage, COVER_MAX_LONG_SIDE } from "../lib/imageResize";
 import {
   buildActivityPhotoPath,
+  buildTripCoverPath,
   uploadPhoto,
   deletePhoto as storageDeletePhoto,
 } from "../lib/photoStorage";
@@ -512,4 +513,57 @@ export async function updateActivityPhotoOrder(id, sortOrder) {
     await enqueue("activity_photos", "update", id, normalizeForSync(entity));
   }
   return entity;
+}
+
+/**
+ * 여행 커버 이미지 업로드/교체.
+ *
+ * 흐름:
+ *   1. 리사이즈 (긴 변 2560px, JPEG 90%)
+ *   2. Storage 업로드 (upsert - 기존 커버 덮어쓰기)
+ *   3. trips.coverStoragePath 업데이트
+ *
+ * @param {string} tripId
+ * @param {string} ownerId
+ * @param {File} file
+ */
+export async function updateTripCover(tripId, ownerId, file) {
+  const resized = await resizeImage(file, {
+    maxLongSide: COVER_MAX_LONG_SIDE,
+  });
+
+  const storagePath = buildTripCoverPath(ownerId, tripId);
+
+  // upsert: true로 업로드 (기존 커버 덮어쓰기)
+  const { supabase } = await import("../lib/supabase");
+  const { error } = await supabase.storage
+    .from("travel-photos")
+    .upload(storagePath, resized.blob, {
+      contentType: "image/jpeg",
+      cacheControl: "3600",
+      upsert: true,
+    });
+  if (error) throw error;
+
+  // trips 메타 업데이트
+  return await updateTrip(tripId, { coverStoragePath: storagePath });
+}
+
+/**
+ * 여행 커버 이미지 제거.
+ */
+export async function deleteTripCover(tripId) {
+  const trip = await db.trips.get(tripId);
+  if (!trip?.coverStoragePath) return;
+
+  const path = trip.coverStoragePath;
+
+  // Storage 삭제 (실패해도 진행)
+  try {
+    await storageDeletePhoto(path);
+  } catch (err) {
+    console.warn("[cover] Storage 삭제 실패, 메타는 계속 진행:", err);
+  }
+
+  return await updateTrip(tripId, { coverStoragePath: null });
 }

@@ -33,11 +33,13 @@ import {
   useUpdateAccommodation,
   useDeleteAccommodation,
   useUpsertDayNote,
+  useCoverUrl,
 } from "../data/hooks";
 import { calcTripTotal } from "../data/calc";
 import { useToast } from "../components/Toast";
 import { IconSparkles } from "@tabler/icons-react";
 import PromptGeneratorModal from "../components/PromptGeneratorModal";
+import CoverImageManager from "../components/CoverImageManager";
 
 function TripDetailPage() {
   const { id } = useParams();
@@ -80,6 +82,9 @@ function TripDetailPage() {
   const showActivityForm = searchParams.get("new") === "1";
 
   const [showPromptModal, setShowPromptModal] = useState(false);
+
+  const coverUrl = useCoverUrl(trip?.coverStoragePath);
+  const [showCoverModal, setShowCoverModal] = useState(false);
 
   const toast = useToast();
 
@@ -293,13 +298,21 @@ function TripDetailPage() {
 
   return (
     <div className="-mt-4 -mx-4">
-      <div className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-hero-from to-hero-to">
-        <div className="flex justify-between">
+      <div
+        className="relative h-[180px] px-4 py-3 bg-gradient-to-br from-hero-from to-hero-to bg-cover bg-center"
+        style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+      >
+        {/* 이미지 있을 때 텍스트 가독성 오버레이 */}
+        {coverUrl && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/40 pointer-events-none" />
+        )}
+
+        <div className="relative flex justify-between">
           <button
             type="button"
             onClick={() => navigate("/")}
             aria-label="뒤로 가기"
-            className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
+            className="p-1.5 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
           >
             <IconArrowLeft size={18} />
           </button>
@@ -309,15 +322,16 @@ function TripDetailPage() {
               onClick={() => setShowPromptModal(true)}
               aria-label="AI 커버 프롬프트"
               title="AI 커버 이미지 프롬프트 생성"
-              className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
+              className="p-1.5 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
             >
               <IconSparkles size={18} />
             </button>
             <button
               type="button"
-              aria-label="사진 추가 (준비 중)"
-              title="사진 추가 (준비 중)"
-              className="p-1.5 rounded-full bg-black/15 text-white hover:bg-black/25 transition-colors"
+              onClick={() => setShowCoverModal(true)}
+              aria-label="커버 이미지"
+              title="커버 이미지 업로드/변경"
+              className="p-1.5 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
             >
               <IconCameraPlus size={18} />
             </button>
@@ -545,6 +559,14 @@ function TripDetailPage() {
           trip={trip}
           activities={activities}
           onClose={() => setShowPromptModal(false)}
+        />
+      )}
+
+      {showCoverModal && (
+        <CoverImageManager
+          tripId={id}
+          hasCover={!!trip.coverStoragePath}
+          onClose={() => setShowCoverModal(false)}
         />
       )}
     </div>
