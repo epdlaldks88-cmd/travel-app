@@ -2,8 +2,11 @@ import { useSearchParams } from "react-router-dom";
 import TripForm from "../components/TripForm";
 import TripList from "../components/TripList";
 import { useTrips, useCreateTrip, useDeleteTrip } from "../data/hooks";
+import { useBackButtonExit } from "../lib/useBackButtonExit";
 
 function HomePage() {
+  useBackButtonExit();
+
   const trips = useTrips();
   const createTrip = useCreateTrip();
   const deleteTrip = useDeleteTrip();
