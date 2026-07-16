@@ -5,17 +5,36 @@ import { Button, Card, Chip, Input, Select, Label } from "./ui";
 
 const CATEGORY_OPTIONS = ["바다", "산", "도시", "맛집", "문화"];
 
-function TripForm({ onAdd, onCancel }) {
-  const [title, setTitle] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [companions, setCompanions] = useState("");
+/**
+ * 여행 신규/편집 폼.
+ *
+ * initialData 없으면 신규 (onAdd 콜백 사용).
+ * initialData 있으면 편집 (onSubmit 콜백 사용).
+ */
+function TripForm({ initialData = null, onAdd, onSubmit, onCancel }) {
+  const isEditing = !!initialData;
 
-  const [countryType, setCountryType] = useState("domestic");
-  const [countryName, setCountryName] = useState("");
-  const [regionMajor, setRegionMajor] = useState("");
-  const [regionMinor, setRegionMinor] = useState("");
-  const [categories, setCategories] = useState([]);
+  // 편집 모드 초기값 계산 (국내/해외 구분)
+  const initialCountryType =
+    initialData?.countryType ||
+    (initialData?.countryName ? "international" : "domestic");
+
+  const [title, setTitle] = useState(initialData?.title ?? "");
+  const [startDate, setStartDate] = useState(initialData?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initialData?.endDate ?? "");
+  const [companions, setCompanions] = useState(initialData?.companions ?? "");
+
+  const [countryType, setCountryType] = useState(initialCountryType);
+  const [countryName, setCountryName] = useState(
+    initialData?.countryName ?? "",
+  );
+  const [regionMajor, setRegionMajor] = useState(
+    initialData?.regionMajor ?? "",
+  );
+  const [regionMinor, setRegionMinor] = useState(
+    initialData?.regionMinor ?? "",
+  );
+  const [categories, setCategories] = useState(initialData?.categories ?? []);
 
   const selectedMajor = DOMESTIC_REGIONS.find((r) => r.major === regionMajor);
   const availableMinors = selectedMajor ? selectedMajor.minors : [];
@@ -38,25 +57,7 @@ function TripForm({ onAdd, onCancel }) {
     );
   };
 
-  const handleSubmit = () => {
-    if (!title.trim()) {
-      alert("여행 제목을 입력하세요");
-      return;
-    }
-
-    onAdd({
-      title,
-      startDate,
-      endDate,
-      companions,
-      countryType,
-      countryName: countryType === "international" ? countryName : "",
-      regionMajor: countryType === "domestic" ? regionMajor : "",
-      regionMinor: countryType === "domestic" ? regionMinor : "",
-      categories,
-    });
-
-    // 초기화
+  const resetForm = () => {
     setTitle("");
     setStartDate("");
     setEndDate("");
@@ -66,6 +67,33 @@ function TripForm({ onAdd, onCancel }) {
     setRegionMajor("");
     setRegionMinor("");
     setCategories([]);
+  };
+
+  const handleSubmit = () => {
+    if (!title.trim()) {
+      alert("여행 제목을 입력하세요");
+      return;
+    }
+
+    const payload = {
+      title,
+      startDate,
+      endDate,
+      companions,
+      countryType,
+      countryName: countryType === "international" ? countryName : "",
+      regionMajor: countryType === "domestic" ? regionMajor : "",
+      regionMinor: countryType === "domestic" ? regionMinor : "",
+      categories,
+    };
+
+    if (isEditing) {
+      onSubmit?.(payload);
+      // 편집 모드는 폼 초기화 안 함 (모달이 닫힘)
+    } else {
+      onAdd?.(payload);
+      resetForm();
+    }
   };
 
   const majorOptions = [
@@ -83,7 +111,9 @@ function TripForm({ onAdd, onCancel }) {
 
   return (
     <Card padding="lg" className="mb-6">
-      <h2 className="text-base font-medium text-text mb-4">새 여행 추가</h2>
+      <h2 className="text-base font-medium text-text mb-4">
+        {isEditing ? "여행 편집" : "새 여행 추가"}
+      </h2>
 
       <div className="space-y-3">
         <div>
@@ -181,7 +211,7 @@ function TripForm({ onAdd, onCancel }) {
           </div>
         </div>
 
-        {/* 취소 · 추가 버튼 */}
+        {/* 취소 · 저장/추가 버튼 */}
         <div className="flex gap-2 pt-1">
           {onCancel && (
             <Button variant="secondary" onClick={onCancel} fullWidth>
@@ -192,9 +222,9 @@ function TripForm({ onAdd, onCancel }) {
             variant="primary"
             onClick={handleSubmit}
             fullWidth
-            leftIcon={<IconPlus size={18} />}
+            leftIcon={!isEditing ? <IconPlus size={18} /> : undefined}
           >
-            여행 추가
+            {isEditing ? "저장" : "여행 추가"}
           </Button>
         </div>
       </div>

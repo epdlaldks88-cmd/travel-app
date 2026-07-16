@@ -37,9 +37,10 @@ import {
 } from "../data/hooks";
 import { calcTripTotal } from "../data/calc";
 import { useToast } from "../components/Toast";
-import { IconSparkles } from "@tabler/icons-react";
+import { IconSparkles, IconEdit } from "@tabler/icons-react";
 import PromptGeneratorModal from "../components/PromptGeneratorModal";
 import CoverImageManager from "../components/CoverImageManager";
+import TripEditModal from "../components/TripEditModal";
 
 function TripDetailPage() {
   const { id } = useParams();
@@ -85,6 +86,8 @@ function TripDetailPage() {
 
   const coverUrl = useCoverUrl(trip?.coverStoragePath);
   const [showCoverModal, setShowCoverModal] = useState(false);
+
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const toast = useToast();
 
@@ -264,6 +267,17 @@ function TripDetailPage() {
     }
   };
 
+  const handleEditTrip = async (payload) => {
+    try {
+      await updateTrip(id, payload);
+      setShowEditModal(false);
+      toast.success("여행이 저장되었습니다");
+    } catch (err) {
+      console.error(err);
+      toast.error("저장 실패: " + (err.message || "알 수 없는 오류"));
+    }
+  };
+
   if (trip === undefined) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -317,6 +331,15 @@ function TripDetailPage() {
             <IconArrowLeft size={18} />
           </button>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEditModal(true)}
+              aria-label="여행 편집"
+              title="여행 정보 편집"
+              className="p-1.5 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
+            >
+              <IconEdit size={18} />
+            </button>
             <button
               type="button"
               onClick={() => setShowPromptModal(true)}
@@ -567,6 +590,14 @@ function TripDetailPage() {
           tripId={id}
           hasCover={!!trip.coverStoragePath}
           onClose={() => setShowCoverModal(false)}
+        />
+      )}
+
+      {showEditModal && (
+        <TripEditModal
+          trip={trip}
+          onSubmit={handleEditTrip}
+          onClose={() => setShowEditModal(false)}
         />
       )}
     </div>
