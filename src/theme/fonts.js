@@ -58,6 +58,30 @@ export const fonts = {
     heading: `'Ownglyph_meetme-Rg', 'Gowun Dodum', cursive`,
     body: `'Gowun Dodum', ${SYSTEM_FALLBACK}`,
   },
+
+  pretendard: {
+    key: "pretendard",
+    label: "프리미엄 모던",
+    description: "가장 정교한 프리미엄 산세리프",
+    heading: `'Pretendard', 'Inter', ${SYSTEM_FALLBACK}`,
+    body: `'Pretendard', 'Inter', ${SYSTEM_FALLBACK}`,
+  },
+
+  sensitive: {
+    key: "sensitive",
+    label: "시적인 감성",
+    description: "가냘프고 깊은 울림의 명조 송명",
+    heading: `'Song Myung', serif`,
+    body: `'Gowun Dodum', ${SYSTEM_FALLBACK}`,
+  },
+
+  cute: {
+    key: "cute",
+    label: "아기자기",
+    description: "귀엽고 동글동글한 여행 일기체",
+    heading: `'Single Day', 'Jua', cursive`,
+    body: `'Gamja Flower', 'Jua', sans-serif`,
+  },
 };
 
 /** 전체 폰트 프리셋 배열 */

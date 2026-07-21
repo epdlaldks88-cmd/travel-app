@@ -61,7 +61,8 @@ export default function Button({
       disabled={isDisabled}
       className={[
         'inline-flex items-center justify-center font-medium',
-        'transition-[background-color,opacity] duration-150',
+        'transition-all duration-200 ease-out',
+        'hover:scale-[1.015] active:scale-[0.985] hover:shadow-sm disabled:hover:scale-100 disabled:active:scale-100 disabled:shadow-none',
         'disabled:cursor-not-allowed select-none',
         variantMap[variant],
         sizeMap[size],

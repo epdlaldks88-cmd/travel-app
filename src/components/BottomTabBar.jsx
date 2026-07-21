@@ -29,7 +29,7 @@ function BottomTabBar() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-bg border-t border-border pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 bg-bg/80 backdrop-blur-lg border-t border-border/80 shadow-lg pb-[env(safe-area-inset-bottom)] z-50">
       <div className="max-w-2xl mx-auto flex justify-around items-center relative h-14 px-4">
         <TabLink to="/" icon={IconHome} label="홈" active={isActive("/")} />
         <TabLink
@@ -43,7 +43,7 @@ function BottomTabBar() {
           type="button"
           onClick={handleFabClick}
           aria-label="새로 추가"
-          className="w-12 h-12 -mt-4 rounded-full flex items-center justify-center bg-accent text-accent-fg shadow-lg hover:opacity-90 active:opacity-80 transition-opacity"
+          className="w-12 h-12 -mt-4 rounded-full flex items-center justify-center bg-accent text-accent-fg shadow-lg hover:scale-110 active:scale-95 hover:shadow-xl transition-all duration-200 z-10"
         >
           <IconPlus size={22} />
         </button>
@@ -69,11 +69,11 @@ function TabLink({ to, icon: Icon, label, active }) {
   return (
     <Link
       to={to}
-      className={`flex flex-col items-center gap-1 transition-colors ${
-        active ? "text-text" : "text-text-subtle"
+      className={`flex flex-col items-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 ${
+        active ? "text-text" : "text-text-subtle hover:text-text"
       }`}
     >
-      <Icon size={22} />
+      <Icon size={22} className={`transition-transform duration-200 ${active ? "scale-110" : ""}`} />
       <span className="text-[10px] font-medium">{label}</span>
     </Link>
   );

@@ -27,9 +27,9 @@ export default function Card({
   ...rest
 }) {
   const clickable = typeof onClick === 'function';
-  const base = 'bg-surface border border-border rounded-2xl transition-colors';
+  const base = 'bg-surface border border-border rounded-2xl shadow-sm transition-all duration-255';
   const interactive = clickable
-    ? 'cursor-pointer hover:bg-surface-alt active:bg-surface-alt'
+    ? 'cursor-pointer hover:bg-surface-alt hover:shadow-md hover:-translate-y-0.5 active:bg-surface-alt active:translate-y-0 active:shadow-sm'
     : '';
 
   return (
